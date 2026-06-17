@@ -18,8 +18,8 @@ API_URL = "https://www.googleapis.com/pagespeedonline/v5/runPagespeed"
 
 VOLUME_PATH = Path("/Volumes/workspace/site-speed-recommendation/")
 CACHE_DIR = VOLUME_PATH / "desktop_cache"
-URL_LIST   = VOLUME_PATH / "raw_data" / "collected_urls_v3.json"
-OUT_DIR    = VOLUME_PATH / "raw_data" / "site_info_desktop_v3.json"
+URL_LIST   = VOLUME_PATH / "raw_data" / "collected_urls_v5.json"
+OUT_DIR    = VOLUME_PATH / "raw_data" / "site_info_desktop_v5.json"
 
 CACHE_DIR.mkdir(parents=True, exist_ok=True)
 URL_LIST.parent.mkdir(parents=True, exist_ok=True)
@@ -62,8 +62,11 @@ def run_batch():
     domain_url_map = json.load(f)
   
   results = {}
-  
+  batch_length = len(domain_url_map)
+  counter = 0
+
   for domain, urls in domain_url_map.items():
+    counter += 1 
     print(f"\nProcessing domain: {domain}")
     results[domain] = {}
     
@@ -95,7 +98,8 @@ def run_batch():
       cleaned["raw_cache_path"] = str(cache_path)
       results[domain][url] = cleaned
       
-      print("-> Finished")
+      completion_percent = counter / batch_length * 100
+      print(f" -> Finished | {completion_percent:.2f}% complete")
       time.sleep(1.2)
     
     print(f"Completed domain: {domain}")

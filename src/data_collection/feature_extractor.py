@@ -222,11 +222,11 @@ def flatten_psi_json_to_csv(psi_json_path, output_csv_path, strategy):
 
 if __name__ == "__main__":
     VOLUME_PATH      = Path("/Volumes/workspace/site-speed-recommendation/")
-    IN_DIR_MOBILE    = VOLUME_PATH / "raw_data" / "site_info_mobile_v3.json"
-    IN_DIR_DESKTOP   = VOLUME_PATH / "raw_data" / "site_info_desktop_v3.json"
+    IN_DIR_MOBILE    = VOLUME_PATH / "raw_data" / "site_info_mobile_v5.json"
+    IN_DIR_DESKTOP   = VOLUME_PATH / "raw_data" / "site_info_desktop_v5.json"
 
-    OUT_DIR_MOBILE   = VOLUME_PATH / "psi_data" / "mobile_extracted_raw_v3.csv"
-    OUT_DIR_DESKTOP  = VOLUME_PATH / "psi_data" / "desktop_extracted_raw_v3.csv"
+    OUT_DIR_MOBILE   = VOLUME_PATH / "psi_data" / "mobile_extracted_raw_v5.csv"
+    OUT_DIR_DESKTOP  = VOLUME_PATH / "psi_data" / "desktop_extracted_raw_v5.csv"
 
     IN_DIR_MOBILE.parent.mkdir(parents=True, exist_ok=True)
     OUT_DIR_MOBILE.parent.mkdir(parents=True, exist_ok=True)

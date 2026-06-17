@@ -13,8 +13,8 @@ from pathlib import Path
 
 PAGE_LIMIT = 10 
 VOLUME_PATH = Path("/Volumes/workspace/site-speed-recommendation/raw_data/")
-INPUT_PATH = VOLUME_PATH / "website_list_v3.txt"
-OUTPUT_PATH = VOLUME_PATH / "collected_urls_v3.json"
+INPUT_PATH = VOLUME_PATH / "website_list_v5.txt"
+OUTPUT_PATH = VOLUME_PATH / "collected_urls_v5.json"
 
 def is_valid_url(url):
   parsed = urlparse(url)
