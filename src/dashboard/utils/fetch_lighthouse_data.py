@@ -7,8 +7,8 @@ from pathlib import Path
 import pandas as pd
 
 # This is used if not on databricks
-# import utils.constants as constants
-# API_KEY = constants.API_KEY
+import utils.constants as constants
+API_KEY = constants.API_KEY
 
 def extract_simple_numeric_values(result, audits, keys):
     for k in keys:
@@ -148,28 +148,29 @@ def extract_useful_fields(data):
 
 	return result
 
-def fetch_data(api_key, url):
-	API_KEY = api_key
-	API_URL = "https://www.googleapis.com/pagespeedonline/v5/runPagespeed"
+def fetch_data(url, strategy, api_key=API_KEY):
+    API_KEY = api_key
+    API_URL = "https://www.googleapis.com/pagespeedonline/v5/runPagespeed"
+    STRATEGY = strategy
+    results = {}
 
-	results = {}
+    print(f"Calling PageSpeed API...")
+    api_request_url  = f"{API_URL}?url={url}&strategy={STRATEGY}&key={API_KEY}"
 
-	print(f"Calling PageSpeed API...")
-	api_request_url  = f"{API_URL}?url={url}&key={API_KEY}"
+    try:
+        r = requests.get(api_request_url, timeout=200)
+        data = r.json()
+    except Exception as e:
+        print(f" ERROR: {e}") 
+        return e
 
-	try:
-		r = requests.get(api_request_url, timeout=200)
-		data = r.json()
-	except Exception as e:
-		print(f" ERROR: {e}") 
-		return e
-
-	cleaned = extract_useful_fields(data)
-	result = extract_all_features(cleaned)
-	print(f"Completed url: {url}")
-	return result
+    cleaned = extract_useful_fields(data)
+    result = extract_all_features(cleaned)
+    print(f"Completed url: {url}")
+    return result
 
 # if __name__ == "__main__":
+
 # 	API_KEY = dbutils.secrets.get(
 # 		scope="site_speed_project",
 # 		key="google_psi_api_key"
