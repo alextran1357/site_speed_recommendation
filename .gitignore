@@ -361,4 +361,5 @@ protoc-*-linux-x86_64.zip
 python_cache_key.md5
 
 data/
+models/
 constants.py
