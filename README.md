@@ -76,3 +76,31 @@ This site has higher script size, script execution time, and unused JavaScript s
 
 Suggested Focus:
 Review unused JavaScript, plugins, tracking scripts, and third-party code.
+---
+
+## Dashboard App
+
+The completed dashboard lives in `src/dashboard` and is designed as a business-facing LCP benchmarking tool.
+
+### What it does
+
+- Runs a PageSpeed Insights audit for a submitted URL.
+- Lets the user benchmark against all sites or the selected website category.
+- Shows LCP percentile performance against comparable peers.
+- Ranks the most likely performance investigation areas.
+- Provides plain-English recommendations for business users.
+- Includes a scenario planner that estimates how LCP could change if resource metrics moved toward better peer percentiles.
+
+### Run with conda
+
+```bash
+conda env create -f environment.yml
+conda activate site-speed-insight
+streamlit run src/dashboard/app.py
+```
+
+If you already have a conda environment for this project, install the dependencies from `environment.yml` into that environment and run the same Streamlit command.
+
+### Notes
+
+The scenario planner is a model-based planning estimate, not a guaranteed post-optimization PSI result. Use it to prioritize likely improvement areas, then validate real changes with a fresh audit.
