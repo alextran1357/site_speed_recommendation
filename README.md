@@ -1,97 +1,81 @@
-# Website Speed Benchmarking and Performance Insights
+# Site Speed Insight
 
-## Project Overview
+This project is a Streamlit dashboard for understanding website speed in a more practical way than a raw PageSpeed Insights report.
 
-This project uses Google Lighthouse/PageSpeed Insights data to analyze website performance and help identify the most important areas for improvement.
+PageSpeed Insights already gives a lot of technical detail, but it can still be hard to answer the questions that usually matter most:
 
-Originally, the goal was to predict how much faster a website could become. However, Lighthouse already provides technical recommendations and estimated savings. Because of that, this project was reframed to solve a more practical problem:
+- Is this site actually slow compared to other sites?
+- Which Core Web Vital should be looked at first?
+- Is the issue mostly loading speed, layout stability, responsiveness, or something else?
+- How does the result change when I compare against all sites versus a specific category?
 
-> How does a website perform compared to similar websites, and what performance area should be prioritized first?
+The dashboard adds a benchmarking layer on top of PageSpeed Insights data. A user can run a PSI audit for a URL, then compare the result against a larger dataset of audited websites by device and category.
 
-Instead of replacing Lighthouse, this project builds a data-driven benchmarking layer on top of Lighthouse data. It compares websites against others in the same category and translates technical performance metrics into simpler, more actionable insights.
+## What the Dashboard Does
 
----
+The app currently focuses on the metrics that users and site owners are most likely to care about:
 
-## Problem Statement
-
-Website owners can run Lighthouse and receive a detailed performance report, but the results can be difficult to interpret.
-
-A Lighthouse report may show metrics like:
-
-- Largest Contentful Paint
-- Total Blocking Time
+- Largest Contentful Paint (LCP)
+- Cumulative Layout Shift (CLS)
+- Interaction to Next Paint (INP)
+- Performance Score
+- First Contentful Paint (FCP)
+- Total Blocking Time (TBT)
 - Speed Index
-- Cumulative Layout Shift
-- JavaScript transfer size
-- Image transfer size
-- DOM size
-- Third-party requests
+- Time to First Byte (TTFB)
+- Time to Interactive
 
-However, a non-technical user may still not know:
+The main Overview page highlights LCP, CLS, and INP first because those are the Core Web Vitals. Supporting PageSpeed metrics are still available in the Metric Details tab, but they are treated as secondary signals.
 
-- Is my website actually slow compared to similar websites?
-- Which performance issue is the biggest concern?
-- Should I focus on JavaScript, images, third-party scripts, or layout issues first?
-- Are my Lighthouse results unusually bad or fairly normal for my website category?
+## Main Features
 
-This project addresses that gap by turning Lighthouse data into a benchmark and priority guide.
+- Run a PageSpeed Insights audit from the dashboard.
+- Compare the result against all sites or a selected site category.
+- Switch benchmark categories after the audit without rerunning PSI.
+- Show Core Web Vitals as the main user-facing metrics.
+- Provide a "What to Fix First" section with links to web.dev guides.
+- Show detailed benchmark cards for each metric.
+- Include a what-if planner for estimating how LCP might change if resource metrics improved.
+- Keep raw audit data available for debugging or deeper review.
 
----
+## Why I Built It This Way
 
-## Project Goal
+My original idea was to predict how much faster a website could become. After working with Lighthouse data more, I realized that a more useful problem was benchmarking and prioritization.
 
-The goal of this project is to create a system that can:
+A business user does not always need another long technical report. They need to know where to start. This dashboard is meant to turn PSI data into something easier to compare, explain, and act on.
 
-1. Collect Lighthouse performance data for many websites.
-2. Organize websites by category and device strategy.
-3. Compare an individual website against similar websites.
-4. Identify which performance metrics are unusually poor.
-5. Recommend the most likely area to investigate first.
+## Data
 
----
-
-## Example Output
-
-For a given website, the final tool could produce an output like:
+The dashboard uses audit data stored in `src/dashboard/data`. Each metric has its own benchmark CSV with a similar structure:
 
 ```text
-Website: example.com
-Category: Local Business
-Device: Mobile
+metric_value
+supporting resource metrics
+category
+strategy
+```
 
-Overall Performance:
-Worse than 76% of similar websites
+The category data is used so a user can compare a site against all audited sites or against sites in a similar category.
 
-Largest Contentful Paint:
-Worse than 82% of similar websites
+## Project Structure
 
-Total Blocking Time:
-Worse than 70% of similar websites
+```text
+src/
+  dashboard/
+    app.py                 Streamlit app entry point
+    modules/
+      site_tester.py       Dashboard UI and benchmark logic
+    utils/
+      data_loader.py       Loads metric benchmark datasets
+      fetch_lighthouse_data.py
+      predict.py
+    data/                  Benchmark CSV files
+    models/                Saved LCP model
+```
 
-Main Performance Issue:
-JavaScript
+## Run the App
 
-Why:
-This site has higher script size, script execution time, and unused JavaScript savings than most similar websites.
-
-Suggested Focus:
-Review unused JavaScript, plugins, tracking scripts, and third-party code.
----
-
-## Dashboard App
-
-The completed dashboard lives in `src/dashboard` and is designed as a business-facing LCP benchmarking tool.
-
-### What it does
-
-- Runs a PageSpeed Insights audit for a submitted URL.
-- Lets the user benchmark against all sites or the selected website category.
-- Shows LCP percentile performance against comparable peers.
-- Ranks the most likely performance investigation areas.
-- Provides plain-English recommendations for business users.
-- Includes a scenario planner that estimates how LCP could change if resource metrics moved toward better peer percentiles.
-
-### Run with conda
+This project is intended to run in a conda environment.
 
 ```bash
 conda env create -f environment.yml
@@ -99,8 +83,11 @@ conda activate site-speed-insight
 streamlit run src/dashboard/app.py
 ```
 
-If you already have a conda environment for this project, install the dependencies from `environment.yml` into that environment and run the same Streamlit command.
+If you already have a conda environment for the project, install the dependencies from `environment.yml` and run the same Streamlit command.
 
-### Notes
+## Notes
 
-The scenario planner is a model-based planning estimate, not a guaranteed post-optimization PSI result. Use it to prioritize likely improvement areas, then validate real changes with a fresh audit.
+The what-if planner is a model-based estimate. It should be used for planning and prioritization, not as a promise that a site will hit that exact LCP after changes.
+
+The dashboard still depends on PageSpeed Insights results, so live audits can vary between runs. That is normal for Lighthouse-style lab data.
+

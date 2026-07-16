@@ -1,11 +1,14 @@
-name: site-speed-insight
+name: site-speed-tracker
 channels:
   - conda-forge
+  - defaults
 dependencies:
   - python=3.11
-  - streamlit
+  - jupyterlab
+  - beautifulsoup4
   - pandas
-  - numpy
-  - requests
-  - joblib
-  - scikit-learn
+  - matplotlib
+  - seaborn
+  - xgboost
+  - imbalanced-learn
+  - streamlit
