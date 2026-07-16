@@ -18,8 +18,8 @@ API_URL = "https://www.googleapis.com/pagespeedonline/v5/runPagespeed"
 
 VOLUME_PATH = Path("/Volumes/workspace/site-speed-recommendation/")
 CACHE_DIR = VOLUME_PATH / "desktop_cache"
-URL_LIST   = VOLUME_PATH / "raw_data" / "collected_urls_v5.json"
-OUT_DIR    = VOLUME_PATH / "raw_data" / "site_info_desktop_v5.json"
+URL_LIST   = VOLUME_PATH / "raw_data" / "collected_urls_v8.json"
+OUT_DIR    = VOLUME_PATH / "raw_data" / "site_info_desktop_v8.json"
 
 CACHE_DIR.mkdir(parents=True, exist_ok=True)
 URL_LIST.parent.mkdir(parents=True, exist_ok=True)
