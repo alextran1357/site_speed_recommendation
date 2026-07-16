@@ -1,6 +1,6 @@
 import streamlit as st
 
-from modules.site_tester import load_component, normalize_url
+from modules.site_tester import load_component, normalize_url, render_benchmark_controls
 from utils.data_loader import load_data
 from utils.fetch_lighthouse_data import fetch_data
 from utils.predict import predict
@@ -11,7 +11,7 @@ st.set_page_config(
     layout="wide",
 )
 
-lcp_desktop, lcp_mobile = load_data()
+metric_data = load_data()
 st.markdown(
     """
     <style>
@@ -76,6 +76,9 @@ with st.form("website_submission_form"):
     )
     submitted = st.form_submit_button("Run PSI Audit", type="primary")
 
+comparison_device = st.session_state.strategy.lower() if st.session_state.website_submitted else strategy.lower()
+category, comparison_scope = render_benchmark_controls(metric_data, comparison_device)
+
 if submitted:
     normalized_website = normalize_url(website)
     if not normalized_website:
@@ -103,8 +106,11 @@ if submitted:
 if st.session_state.website_submitted:
     st.divider()
     st.caption(f"Audit: {st.session_state.website} · {st.session_state.strategy}")
-    load_component(lcp_mobile=lcp_mobile, lcp_desktop=lcp_desktop)
+    load_component(metric_data=metric_data, category=category, scope=comparison_scope)
 else:
     st.info("Run a PSI audit to view the dashboard.")
+
+
+
 
 
