@@ -193,7 +193,7 @@ def inject_dashboard_styles():
             .stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp h5, .stApp h6 {color: #e5e7eb !important;}
             .block-container {padding-top: 1.6rem; padding-bottom: 3rem;}
             [data-testid="stMarkdownContainer"] p, [data-testid="stCaptionContainer"], .small-muted {color: #cbd5e1 !important;}
-            div[data-testid="stMetric"], .metric-tile, .benchmark-card, .recommendation-card {
+            div[data-testid="stMetric"], .benchmark-card, .recommendation-card {
                 background: #1f2937 !important;
                 border: 1px solid #334155;
                 border-radius: 8px;
@@ -203,22 +203,23 @@ def inject_dashboard_styles():
             div[data-testid="stMetric"] * {color: #f8fafc !important;}
             div[data-testid="stMetricLabel"] p {font-size: 0.86rem; color: #cbd5e1 !important;}
             div[data-testid="stMetricValue"] {font-size: 1.55rem;}
-            .metric-tile {padding: 18px 20px; min-height: 150px;}
-            .metric-tile h4, .benchmark-card h4, .recommendation-card h4 {margin: 0 0 8px 0; color: #f8fafc !important;}
-            .metric-value {font-size: 2rem; line-height: 1.1; font-weight: 800; color: #f8fafc !important; margin-bottom: 10px;}
-            .metric-meta, .metric-tile p, .benchmark-card p, .recommendation-card p {margin: 0; color: #cbd5e1 !important; line-height: 1.5;}
+            .benchmark-card h4, .recommendation-card h4 {margin: 0 0 8px 0; color: #f8fafc !important;}
+            .benchmark-card p, .recommendation-card p {margin: 0; color: #cbd5e1 !important; line-height: 1.5;}
             .status-good {color: #34d399 !important; font-weight: 750;}
             .status-watch {color: #fbbf24 !important; font-weight: 750;}
             .status-poor {color: #f87171 !important; font-weight: 750;}
-            .metric-value.status-good {color: #34d399 !important;}
-            .metric-value.status-watch {color: #fbbf24 !important;}
-            .metric-value.status-poor {color: #f87171 !important;}
-            .metric-value.small-muted {color: #94a3b8 !important;}
-            .status-pill {display: inline-block; border-radius: 999px; padding: 2px 9px; margin-right: 4px; font-size: 0.78rem; line-height: 1.5;}
-            .status-pill.status-good {background: rgba(34, 197, 94, 0.18); color: #34d399 !important;}
-            .status-pill.status-watch {background: rgba(245, 158, 11, 0.2); color: #fbbf24 !important;}
-            .status-pill.status-poor {background: rgba(239, 68, 68, 0.2); color: #f87171 !important;}
-            .status-pill.small-muted {background: rgba(100, 116, 139, 0.22); color: #cbd5e1 !important;}
+            .compact-metric {padding: 0 0 4px; min-height: 68px;}
+            .compact-label {font-size: 0.8rem; font-weight: 650; color: #cbd5e1 !important; margin-bottom: 1px;}
+            .compact-value {font-size: 1.75rem; line-height: 1.05; font-weight: 800; margin-bottom: 2px;}
+            .compact-value.status-good {color: #34d399 !important;}
+            .compact-value.status-watch {color: #fbbf24 !important;}
+            .compact-value.status-poor {color: #f87171 !important;}
+            .compact-value.small-muted {color: #94a3b8 !important;}
+            .compact-meta {font-size: 0.72rem; color: #94a3b8 !important;}
+            .compact-meta .status-good {color: #34d399 !important;}
+            .compact-meta .status-watch {color: #fbbf24 !important;}
+            .compact-meta .status-poor {color: #f87171 !important;}
+            .metric-section-divider {border-top: 1px solid #334155; margin: 2px 0 8px;}
             .benchmark-card {padding: 16px 18px; margin-bottom: 14px;}
             .benchmark-header {display: flex; justify-content: space-between; gap: 16px; align-items: baseline;}
             .benchmark-title {font-size: 1.08rem; font-weight: 750; color: #f8fafc !important;}
@@ -238,7 +239,7 @@ def inject_dashboard_styles():
             .recommendation-card {padding: 18px 20px; margin-bottom: 14px;}
             .recommendation-card h4 {font-size: 1.05rem;}
             .recommendation-meta {margin-bottom: 8px !important; color: #cbd5e1 !important;}
-            .overview-recs {margin-top: 22px;}
+            .overview-recs {margin-top: 10px;}
             .action-grid {display: grid; grid-template-columns: 1.25fr 1fr; gap: 14px; margin-top: 10px;}
             .action-card-primary {border-color: #475569; background: #243244 !important;}
             .resource-link {display: inline-block; margin-top: 10px; color: #93c5fd !important; font-weight: 700; text-decoration: none;}
@@ -450,10 +451,10 @@ def metric_title(row):
 def render_metric_tile(row):
     st.markdown(
         f"""
-        <div class="metric-tile {row['status_class']}">
-            <h4>{metric_title(row)}</h4>
-            <div class="metric-value {row['status_class']}">{row['Current value']}</div>
-            <p class="metric-meta"><span class="status-pill {row['status_class']}">{row['Status']}</span> {target_text_for(row)}</p>
+        <div class="compact-metric">
+            <div class="compact-label">{metric_title(row)}</div>
+            <div class="compact-value {row['status_class']}">{row['Current value']}</div>
+            <div class="compact-meta"><span class="{row['status_class']}">{row['Status']}</span> · {target_text_for(row)}</div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -595,25 +596,24 @@ def render_overview(result, strategy, reference_label, metric_rows):
     field_rows = build_field_metric_rows(result)
     field_scope = result.get("field_data_scope")
 
-    st.subheader("Overview")
-    lab_col, field_col = st.columns(2)
-    with lab_col:
-        st.markdown("### Lab snapshot")
-        st.caption(f"One Lighthouse test using simulated {strategy.lower()} conditions.")
-        for row in lab_rows:
-            render_metric_tile(row)
-    with field_col:
-        st.markdown("### Real-user field data")
-        if field_scope == "URL":
-            st.caption("CrUX data for this URL from the previous 28 days · all devices.")
-        elif field_scope == "Origin":
-            st.caption("URL data was unavailable, so this shows origin-level CrUX data from the previous 28 days · all devices.")
-        else:
-            st.caption("CrUX does not have enough real-user data for this URL or origin.")
-        for row in field_rows:
+    st.markdown(f"**Lab data** · Simulated {strategy.lower()} · Benchmark: {reference_label}")
+    lab_cols = st.columns(3)
+    for col, row in zip(lab_cols, lab_rows):
+        with col:
             render_metric_tile(row)
 
-    st.caption(f"Lab benchmark set: {reference_label} · Simulated device: {strategy}")
+    st.markdown('<div class="metric-section-divider"></div>', unsafe_allow_html=True)
+    if field_scope == "URL":
+        field_context = "CrUX for this URL · Previous 28 days · All devices"
+    elif field_scope == "Origin":
+        field_context = "Origin-level CrUX fallback · Previous 28 days · All devices"
+    else:
+        field_context = "CrUX unavailable for this URL and origin"
+    st.markdown(f"**Field data** · {field_context}")
+    field_cols = st.columns(3)
+    for col, row in zip(field_cols, field_rows):
+        with col:
+            render_metric_tile(row)
 
     st.markdown('<div class="overview-recs">', unsafe_allow_html=True)
     st.subheader("What to Fix First")
