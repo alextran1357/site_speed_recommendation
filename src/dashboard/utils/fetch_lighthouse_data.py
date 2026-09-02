@@ -146,30 +146,27 @@ def extract_useful_fields(data):
 	return result
 
 def fetch_data(url, strategy, api_key=API_KEY):
-    API_KEY = api_key
-    API_URL = "https://www.googleapis.com/pagespeedonline/v5/runPagespeed"
-    STRATEGY = strategy
-    results = {}
+    api_url = "https://pagespeedonline.googleapis.com/pagespeedonline/v5/runPagespeed"
 
-    print(f"Calling PageSpeed API...")
-    api_request_url  = f"{API_URL}?url={url}&strategy={STRATEGY}&key={API_KEY}"
+    print("Calling PageSpeed API...")
 
     try:
-        r = requests.get(api_request_url, timeout=200)
+        r = requests.get(
+            api_url,
+            params={"url": url, "strategy": strategy, "key": api_key},
+            timeout=120,
+        )
         data = r.json()
-    except Exception as e:
-        print(f" ERROR: {e}") 
-        return e
+    except (requests.RequestException, ValueError) as error:
+        print(f"ERROR: {error}")
+        return {"error": "PageSpeed Insights could not complete the request."}
+
+    if not r.ok:
+        message = data.get("error", {}).get("message", f"PageSpeed Insights returned HTTP {r.status_code}.")
+        print(f"ERROR: {message}")
+        return {"error": message}
 
     cleaned = extract_useful_fields(data)
     result = extract_all_features(cleaned)
     print(f"Completed url: {url}")
     return result
-
-# if __name__ == "__main__":
-
-# 	API_KEY = dbutils.secrets.get(
-# 		scope="site_speed_project",
-# 		key="google_psi_api_key"
-# 	)
-# 	fetch_data(API_KEY, "https://www.zillow.com/")
