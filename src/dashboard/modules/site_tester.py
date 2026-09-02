@@ -210,6 +210,15 @@ def inject_dashboard_styles():
             .status-good {color: #34d399 !important; font-weight: 750;}
             .status-watch {color: #fbbf24 !important; font-weight: 750;}
             .status-poor {color: #f87171 !important; font-weight: 750;}
+            .metric-value.status-good {color: #34d399 !important;}
+            .metric-value.status-watch {color: #fbbf24 !important;}
+            .metric-value.status-poor {color: #f87171 !important;}
+            .metric-value.small-muted {color: #94a3b8 !important;}
+            .status-pill {display: inline-block; border-radius: 999px; padding: 2px 9px; margin-right: 4px; font-size: 0.78rem; line-height: 1.5;}
+            .status-pill.status-good {background: rgba(34, 197, 94, 0.18); color: #34d399 !important;}
+            .status-pill.status-watch {background: rgba(245, 158, 11, 0.2); color: #fbbf24 !important;}
+            .status-pill.status-poor {background: rgba(239, 68, 68, 0.2); color: #f87171 !important;}
+            .status-pill.small-muted {background: rgba(100, 116, 139, 0.22); color: #cbd5e1 !important;}
             .benchmark-card {padding: 16px 18px; margin-bottom: 14px;}
             .benchmark-header {display: flex; justify-content: space-between; gap: 16px; align-items: baseline;}
             .benchmark-title {font-size: 1.08rem; font-weight: 750; color: #f8fafc !important;}
@@ -220,13 +229,20 @@ def inject_dashboard_styles():
             .benchmark-marker {position: absolute; top: -6px; height: 28px; width: 5px; background: #f8fafc; border: 2px solid #111827; border-radius: 999px; box-shadow: 0 0 0 1px #f8fafc; transform: translateX(-50%); z-index: 2;}
             .scale-labels {display: flex; justify-content: space-between; color: #cbd5e1 !important; font-size: 0.78rem; margin-bottom: 8px;}
             .scale-labels span {color: #cbd5e1 !important;}
+            .scale-labels span.status-good {color: #34d399 !important;}
+            .scale-labels span.status-watch {color: #fbbf24 !important;}
+            .scale-labels span.status-poor {color: #f87171 !important;}
             .benchmark-meta {display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 12px;}
             .benchmark-meta div {background: #273449; border-radius: 6px; padding: 8px 10px; color: #f8fafc !important;}
             .benchmark-meta span {display: block; color: #cbd5e1 !important; font-size: 0.78rem;}
             .recommendation-card {padding: 18px 20px; margin-bottom: 14px;}
             .recommendation-card h4 {font-size: 1.05rem;}
             .recommendation-meta {margin-bottom: 8px !important; color: #cbd5e1 !important;}
-            .overview-recs {margin-top: 22px;}`r`n            .action-grid {display: grid; grid-template-columns: 1.25fr 1fr; gap: 14px; margin-top: 10px;}`r`n            .action-card-primary {border-color: #475569; background: #243244 !important;}`r`n            .resource-link {display: inline-block; margin-top: 10px; color: #93c5fd !important; font-weight: 700; text-decoration: none;}`r`n            .resource-link:hover {text-decoration: underline;}
+            .overview-recs {margin-top: 22px;}
+            .action-grid {display: grid; grid-template-columns: 1.25fr 1fr; gap: 14px; margin-top: 10px;}
+            .action-card-primary {border-color: #475569; background: #243244 !important;}
+            .resource-link {display: inline-block; margin-top: 10px; color: #93c5fd !important; font-weight: 700; text-decoration: none;}
+            .resource-link:hover {text-decoration: underline;}
             div[data-baseweb="input"] input, div[data-baseweb="select"] > div, textarea {background: #1f2937 !important; color: #f9fafb !important; border-color: #475569 !important;}
             div[role="radiogroup"] label span, [data-baseweb="tab"] p {color: #e5e7eb !important;}
         </style>
@@ -434,10 +450,10 @@ def metric_title(row):
 def render_metric_tile(row):
     st.markdown(
         f"""
-        <div class="metric-tile">
+        <div class="metric-tile {row['status_class']}">
             <h4>{metric_title(row)}</h4>
-            <div class="metric-value">{row['Current value']}</div>
-            <p class="metric-meta"><span class="{row['status_class']}">{row['Status']}</span> · {target_text_for(row)}</p>
+            <div class="metric-value {row['status_class']}">{row['Current value']}</div>
+            <p class="metric-meta"><span class="status-pill {row['status_class']}">{row['Status']}</span> {target_text_for(row)}</p>
         </div>
         """,
         unsafe_allow_html=True,
@@ -452,7 +468,7 @@ def render_benchmark_card(row):
 
     st.markdown(
         f"""
-        <div class="benchmark-card">
+        <div class="benchmark-card {row['status_class']}">
             <div class="benchmark-header">
                 <div>
                     <div class="benchmark-title">{row['Metric']}</div>
@@ -463,7 +479,7 @@ def render_benchmark_card(row):
             <div class="benchmark-track {row['track_class']}" style="{row['track_style']}">
                 <div class="benchmark-marker" style="left: {row['marker_position']}%;"></div>
             </div>
-            <div class="scale-labels"><span>{row['Status basis']}</span><span>{row['Current value']}</span></div>
+            <div class="scale-labels"><span>{row['Status basis']}</span><span class="{row['status_class']}">{row['Current value']}</span></div>
             <p><span class="{row['status_class']}">{row['Status']}</span> - {explanation}</p>
             <div class="benchmark-meta">
                 <div><span>This site</span>{row['Current value']}</div>
