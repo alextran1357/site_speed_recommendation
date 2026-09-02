@@ -3,7 +3,6 @@ import streamlit as st
 from modules.site_tester import load_component, normalize_url, render_benchmark_controls
 from utils.data_loader import load_data
 from utils.fetch_lighthouse_data import fetch_data
-from utils.predict import predict
 
 st.set_page_config(
     page_title="Site Speed Insight",
@@ -93,14 +92,14 @@ if submitted:
 
         if not isinstance(result, dict) or not result:
             st.error("The PageSpeed audit did not return usable data. Check the URL and try again.")
+        elif result.get("error"):
+            st.error(f"The PageSpeed audit failed: {result['error']}")
         elif result.get("largest-contentful-paint") is None:
             st.error("The audit completed, but LCP was unavailable for this URL.")
         else:
-            prediction = predict(result, strategy.lower())
             st.session_state.result = result
             st.session_state.website = normalized_website
             st.session_state.strategy = strategy
-            st.session_state.pred_value = None if prediction is None else float(prediction[0])
             st.session_state.website_submitted = True
 
 if st.session_state.website_submitted:

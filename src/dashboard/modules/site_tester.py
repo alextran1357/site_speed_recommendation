@@ -656,19 +656,16 @@ def load_component(metric_data, category, scope):
     result = st.session_state.result
     strategy = st.session_state.strategy
     device = strategy.lower()
-    pred_value = st.session_state.get("pred_value")
 
-    lcp_reference_data, reference_label = get_reference_data(metric_data, "largest-contentful-paint", device, category, scope)
+    _, reference_label = get_reference_data(metric_data, "largest-contentful-paint", device, category, scope)
     metric_rows = build_metric_rows(result, metric_data, device, category, scope)
 
-    tabs = st.tabs(["Overview", "Metric Details", "What-if Planner", "Raw Audit Data"])
+    tabs = st.tabs(["Overview", "Metric Details", "Raw Audit Data"])
     with tabs[0]:
         render_overview(strategy, category, reference_label, metric_rows)
     with tabs[1]:
         render_benchmark(metric_rows, reference_label)
     with tabs[2]:
-        render_scenario_planner(result, device, lcp_reference_data, pred_value)
-    with tabs[3]:
         render_raw_audit(result)
 
 
