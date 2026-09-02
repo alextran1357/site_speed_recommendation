@@ -244,6 +244,9 @@ def inject_dashboard_styles():
             .action-card-primary {border-color: #475569; background: #243244 !important;}
             .resource-link {display: inline-block; margin-top: 10px; color: #93c5fd !important; font-weight: 700; text-decoration: none;}
             .resource-link:hover {text-decoration: underline;}
+            [data-testid="stSelectbox"] label[data-testid="stWidgetLabel"] {display: inline-flex !important; width: fit-content !important; align-items: center; gap: 4px;}
+            [data-testid="stSelectbox"] label[data-testid="stWidgetLabel"] > div {flex: 0 0 auto !important; margin-left: 0 !important;}
+            [data-testid="stSelectbox"] [data-testid="stTooltipIcon"] {margin-left: 0 !important;}
             div[data-baseweb="input"] input, div[data-baseweb="select"] > div, textarea {background: #1f2937 !important; color: #f9fafb !important; border-color: #475569 !important;}
             div[role="radiogroup"] label span, [data-baseweb="tab"] p {color: #e5e7eb !important;}
         </style>
