@@ -62,18 +62,32 @@ st.caption(
     "Run a PageSpeed Insights audit, then compare the result against different site categories without rerunning the test."
 )
 
-with st.form("website_submission_form"):
-    st.warning(
-        "This runs a PageSpeed Insights audit. Lab results can vary between runs and may differ from field Core Web Vitals.",
-        icon="⚠️",
-    )
-    strategy = st.radio("Select device:", ["Mobile", "Desktop"])
-    website = st.text_input(
-        "Enter website to start testing",
-        placeholder="https://www.example.com",
-        key="website_submission",
-    )
-    submitted = st.form_submit_button("Run PSI Audit", type="primary")
+submitted = False
+if st.session_state.website_submitted:
+    audit_col, action_col = st.columns([4, 1])
+    with audit_col:
+        st.success(
+            f"Audit complete: {st.session_state.website} · {st.session_state.strategy}",
+            icon="✅",
+        )
+    with action_col:
+        if st.button("Run another audit", use_container_width=True):
+            st.session_state.website_submitted = False
+            st.rerun()
+else:
+    with st.form("website_submission_form"):
+        st.warning(
+            "This runs a PageSpeed Insights audit. Lab results can vary between runs and may differ from field Core Web Vitals.",
+            icon="⚠️",
+        )
+        strategy = st.radio("Select device:", ["Mobile", "Desktop"])
+        website = st.text_input(
+            "Enter website to start testing",
+            value=st.session_state.get("last_website_input", ""),
+            placeholder="https://www.example.com",
+            key="website_submission",
+        )
+        submitted = st.form_submit_button("Run PSI Audit", type="primary")
 
 
 if submitted:
@@ -97,12 +111,12 @@ if submitted:
         else:
             st.session_state.result = result
             st.session_state.website = normalized_website
+            st.session_state.last_website_input = normalized_website
             st.session_state.strategy = strategy
             st.session_state.website_submitted = True
+            st.rerun()
 
 if st.session_state.website_submitted:
-    st.divider()
-    st.caption(f"Audit: {st.session_state.website} · {st.session_state.strategy}")
     comparison_device = st.session_state.strategy.lower()
     category, comparison_scope = render_benchmark_controls(metric_data, comparison_device)
     load_component(metric_data=metric_data, category=category, scope=comparison_scope)
