@@ -1,3 +1,4 @@
+import html
 import math
 
 import numpy as np
@@ -219,6 +220,9 @@ def inject_dashboard_styles():
             .compact-meta .status-good {color: #34d399 !important;}
             .compact-meta .status-watch {color: #fbbf24 !important;}
             .compact-meta .status-poor {color: #f87171 !important;}
+            .data-source-header {margin: 0 0 6px;}
+            .data-source-header .data-source-title {font-size: 1.1rem; line-height: 1.25; font-weight: 800; color: #f8fafc !important;}
+            .data-source-header .data-source-context {margin-top: 1px; font-size: 0.78rem; line-height: 1.35; color: #94a3b8 !important;}
             .metric-section-divider {border-top: 1px solid #334155; margin: 2px 0 8px;}
             .benchmark-card {padding: 16px 18px; margin-bottom: 14px;}
             .benchmark-header {display: flex; justify-content: space-between; gap: 16px; align-items: baseline;}
@@ -451,6 +455,20 @@ def target_text_for(row):
 
 def metric_title(row):
     return f"{row['Metric']} ({row['short']})"
+
+
+def render_data_source_header(title, context):
+    st.markdown(
+        f"""
+        <div class="data-source-header">
+            <div class="data-source-title">{html.escape(title)}</div>
+            <div class="data-source-context">{html.escape(context)}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def render_metric_tile(row):
     st.markdown(
         f"""
@@ -599,7 +617,10 @@ def render_overview(result, strategy, reference_label, metric_rows):
     field_rows = build_field_metric_rows(result)
     field_scope = result.get("field_data_scope")
 
-    st.markdown(f"**Lab data** · Simulated {strategy.lower()} · Benchmark: {reference_label}")
+    render_data_source_header(
+        "Lab data",
+        f"Controlled test · Simulated {strategy.lower()} · Benchmark: {reference_label}",
+    )
     lab_cols = st.columns(3)
     for col, row in zip(lab_cols, lab_rows):
         with col:
@@ -607,12 +628,12 @@ def render_overview(result, strategy, reference_label, metric_rows):
 
     st.markdown('<div class="metric-section-divider"></div>', unsafe_allow_html=True)
     if field_scope == "URL":
-        field_context = "CrUX for this URL · Previous 28 days · All devices"
+        field_context = "Real-user experience · Previous 28 days · All devices"
     elif field_scope == "Origin":
-        field_context = "Origin-level CrUX fallback · Previous 28 days · All devices"
+        field_context = "Real-user experience · Origin-level fallback · Previous 28 days · All devices"
     else:
-        field_context = "CrUX unavailable for this URL and origin"
-    st.markdown(f"**Field data** · {field_context}")
+        field_context = "Real-user experience · CrUX unavailable for this URL and origin"
+    render_data_source_header("Field data", field_context)
     field_cols = st.columns(3)
     for col, row in zip(field_cols, field_rows):
         with col:
