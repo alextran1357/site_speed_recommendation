@@ -3,12 +3,9 @@ Docstring for util.fetch_lighthouse_data
 
 '''
 import requests
-from pathlib import Path
-import pandas as pd
+import streamlit as st
 
-# This is used if not on databricks
-import utils.constants as constants
-API_KEY = constants.API_KEY
+API_KEY = st.secrets["API_KEY"]
 
 def extract_simple_numeric_values(result, audits, keys):
     for k in keys:
