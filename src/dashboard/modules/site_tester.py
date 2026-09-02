@@ -55,6 +55,36 @@ PRIMARY_METRICS = [
     },
 ]
 
+FIELD_METRICS = [
+    {
+        "label": "Largest Contentful Paint",
+        "key": "field_largest-contentful-paint",
+        "short": "LCP",
+        "unit": "ms",
+        "lower_is_better": True,
+        "thresholds": (2500, 4000),
+        "basis": "Core Web Vitals: good <= 2.5s, needs improvement <= 4.0s, poor > 4.0s.",
+    },
+    {
+        "label": "Cumulative Layout Shift",
+        "key": "field_cumulative-layout-shift",
+        "short": "CLS",
+        "unit": "score",
+        "lower_is_better": True,
+        "thresholds": (0.1, 0.25),
+        "basis": "Core Web Vitals: good <= 0.10, needs improvement <= 0.25, poor > 0.25.",
+    },
+    {
+        "label": "Interaction to Next Paint",
+        "key": "INTERACTION_TO_NEXT_PAINT",
+        "short": "INP",
+        "unit": "ms",
+        "lower_is_better": True,
+        "thresholds": (200, 500),
+        "basis": "Core Web Vitals: good <= 200ms, needs improvement <= 500ms, poor > 500ms.",
+    },
+]
+
 SECONDARY_METRICS = [
     {
         "label": "Performance Score",
@@ -137,6 +167,7 @@ SECONDARY_METRICS = [
 ]
 
 METRIC_DEFINITIONS = PRIMARY_METRICS + SECONDARY_METRICS
+FIELD_DATA_KEYS = {"INTERACTION_TO_NEXT_PAINT", "EXPERIMENTAL_TIME_TO_FIRST_BYTE"}
 
 SCENARIO_METRICS = [
     {"label": "Unused JavaScript", "key": "unused-javascript"},
@@ -353,6 +384,25 @@ def build_metric_rows(result, metric_data, device, category, scope):
     return rows
 
 
+def build_field_metric_rows(result):
+    rows = []
+    for metric_def in FIELD_METRICS:
+        raw_value = clean_number(result.get(metric_def["key"]))
+        status, status_class = threshold_status(metric_def, raw_value)
+        rows.append(
+            {
+                "Metric": metric_def["label"],
+                "Current value": format_value(raw_value, metric_def["unit"]),
+                "Status": status,
+                "status_class": status_class,
+                "Status basis": metric_def["basis"],
+                "key": metric_def["key"],
+                "short": metric_def["short"],
+            }
+        )
+    return rows
+
+
 def priority_score(row):
     percentile = row["Percentile vs peers"]
     if percentile is None:
@@ -371,7 +421,9 @@ def top_opportunities(metric_rows, limit=4):
 def target_text_for(row):
     metric_targets = {
         "largest-contentful-paint": "Target: 2.5s or less",
+        "field_largest-contentful-paint": "Target: 2.5s or less",
         "cumulative-layout-shift": "Target: 0.10 or less",
+        "field_cumulative-layout-shift": "Target: 0.10 or less",
         "INTERACTION_TO_NEXT_PAINT": "Target: 200ms or less",
     }
     return metric_targets.get(row["key"], row["Status basis"])
@@ -385,7 +437,7 @@ def render_metric_tile(row):
         <div class="metric-tile">
             <h4>{metric_title(row)}</h4>
             <div class="metric-value">{row['Current value']}</div>
-            <p class="metric-meta">{target_text_for(row)}</p>
+            <p class="metric-meta"><span class="{row['status_class']}">{row['Status']}</span> · {target_text_for(row)}</p>
         </div>
         """,
         unsafe_allow_html=True,
@@ -518,21 +570,44 @@ def render_result_summary(metric_rows):
         f'<div class="recommendation-card action-card-primary"><h4>Result Summary</h4><p>{message}</p></div>',
         unsafe_allow_html=True,
     )
-def render_overview(strategy, reference_label, metric_rows):
-    primary_rows = [row for row in metric_rows if row["key"] in {"largest-contentful-paint", "cumulative-layout-shift", "INTERACTION_TO_NEXT_PAINT"}]
+def render_overview(result, strategy, reference_label, metric_rows):
+    lab_rows = [
+        row
+        for row in metric_rows
+        if row["key"] in {"largest-contentful-paint", "cumulative-layout-shift", "total-blocking-time"}
+    ]
+    field_rows = build_field_metric_rows(result)
+    field_scope = result.get("field_data_scope")
 
     st.subheader("Overview")
-    cols = st.columns(3)
-    for col, row in zip(cols, primary_rows):
-        with col:
+    lab_col, field_col = st.columns(2)
+    with lab_col:
+        st.markdown("### Lab snapshot")
+        st.caption(f"One Lighthouse test using simulated {strategy.lower()} conditions.")
+        for row in lab_rows:
+            render_metric_tile(row)
+    with field_col:
+        st.markdown("### Real-user field data")
+        if field_scope == "URL":
+            st.caption("CrUX data for this URL from the previous 28 days · all devices.")
+        elif field_scope == "Origin":
+            st.caption("URL data was unavailable, so this shows origin-level CrUX data from the previous 28 days · all devices.")
+        else:
+            st.caption("CrUX does not have enough real-user data for this URL or origin.")
+        for row in field_rows:
             render_metric_tile(row)
 
-    st.caption(f"Benchmark set: {reference_label} · Device: {strategy}")
+    st.caption(f"Lab benchmark set: {reference_label} · Simulated device: {strategy}")
 
     st.markdown('<div class="overview-recs">', unsafe_allow_html=True)
     st.subheader("What to Fix First")
-    st.caption("Start with the metric that is furthest from a healthy user experience, then use the linked guide to investigate the page.")
-    render_action_plan(metric_rows, limit=3)
+    st.caption("Recommendations use the current lab audit and its benchmark set.")
+    lab_action_rows = [
+        row
+        for row in metric_rows
+        if row["key"] not in FIELD_DATA_KEYS
+    ]
+    render_action_plan(lab_action_rows, limit=3)
     st.markdown("</div>", unsafe_allow_html=True)
 
 
@@ -540,18 +615,31 @@ def render_benchmark(metric_rows, reference_label):
     st.subheader("Metric Details")
     st.caption(f"Comparison set: {reference_label}. Open a row to see thresholds, peer median, and benchmark position.")
 
-    st.markdown("#### Core Web Vitals")
-    for row in [row for row in metric_rows if row["tier"] == "Core Web Vital"]:
+    lab_rows = [row for row in metric_rows if row["key"] not in FIELD_DATA_KEYS]
+    field_rows = [row for row in metric_rows if row["key"] in FIELD_DATA_KEYS]
+
+    st.markdown("#### Lab benchmark details")
+    st.caption("Metrics from the current simulated Lighthouse run.")
+    for row in [row for row in lab_rows if row["tier"] == "Core Web Vital"]:
         render_benchmark_card(row)
 
-    st.markdown("#### Supporting PageSpeed Metrics")
-    secondary_rows = [row for row in metric_rows if row["tier"] != "Core Web Vital"]
+    st.markdown("##### Supporting lab metrics")
+    secondary_rows = [row for row in lab_rows if row["tier"] != "Core Web Vital"]
     for row in secondary_rows:
         label = f"{metric_title(row)} · {row['Current value']} · {row['Status']}"
         with st.expander(label, expanded=False):
             render_benchmark_card(row)
 
-    display_df = pd.DataFrame(metric_rows).drop(
+    st.markdown("#### Field benchmark details")
+    st.caption("Real-user CrUX metrics, kept separate from the simulated lab run.")
+    for row in field_rows:
+        render_benchmark_card(row)
+
+    display_rows = [
+        {"Source": "Field" if row["key"] in FIELD_DATA_KEYS else "Lab", **row}
+        for row in metric_rows
+    ]
+    display_df = pd.DataFrame(display_rows).drop(
         columns=["key", "raw_value", "unit", "short", "status_class", "marker_position", "track_class", "track_style"]
     )
     st.dataframe(display_df, use_container_width=True, hide_index=True)
@@ -668,7 +756,7 @@ def load_component(metric_data, category, scope):
 
     tabs = st.tabs(["Overview", "Metric Details", "Raw Audit Data"])
     with tabs[0]:
-        render_overview(strategy, reference_label, metric_rows)
+        render_overview(result, strategy, reference_label, metric_rows)
     with tabs[1]:
         render_benchmark(metric_rows, reference_label)
     with tabs[2]:

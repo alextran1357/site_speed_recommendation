@@ -14,12 +14,17 @@ def extract_simple_numeric_values(result, audits, keys):
         result[k] = value
     return result
 
-def extract_field_values(result, field_data, keys):
-    page_metrics = field_data.get("metrics", {})   
-    for k in keys:
-        audit = page_metrics.get(k, {})
-        value = audit.get("percentile")
-        result[k] = value
+def extract_field_values(result, field_data):
+    page_metrics = field_data.get("metrics", {})
+    field_metrics = {
+        "field_largest-contentful-paint": ("LARGEST_CONTENTFUL_PAINT_MS", 1),
+        "field_cumulative-layout-shift": ("CUMULATIVE_LAYOUT_SHIFT_SCORE", 0.01),
+        "INTERACTION_TO_NEXT_PAINT": ("INTERACTION_TO_NEXT_PAINT", 1),
+        "EXPERIMENTAL_TIME_TO_FIRST_BYTE": ("EXPERIMENTAL_TIME_TO_FIRST_BYTE", 1),
+    }
+    for result_key, (api_key, scale) in field_metrics.items():
+        value = page_metrics.get(api_key, {}).get("percentile")
+        result[result_key] = None if value is None else value * scale
     return result
 
 def extract_resource_summary(result, audits):
@@ -114,14 +119,10 @@ def extract_all_features(data):
 	cache_type = [
 		"cache-insight",
 	]
-	field_keys = [
-		"INTERACTION_TO_NEXT_PAINT",
-		"EXPERIMENTAL_TIME_TO_FIRST_BYTE",
-	]
- 
 	performance_score = data.get("performance_score")
 	result["performance_score"] = performance_score
-	result = extract_field_values(result, field_data, field_keys)
+	result["field_data_scope"] = data.get("field_data_scope")
+	result = extract_field_values(result, field_data)
 	result = extract_simple_numeric_values(result, audits, core_keys)
 	result = extract_simple_numeric_values(result, audits, extra_simple)
 	result = extract_resource_summary(result, audits)
@@ -140,8 +141,17 @@ def extract_useful_fields(data):
 	performance = categories.get("performance", {})
 	result["performance_score"] = performance.get("score")
 
-	result["field_data"] = data.get("loadingExperience", {})
-	result["origin_field_data"] = data.get("originLoadingExperience", {})
+	url_field_data = data.get("loadingExperience", {}) or {}
+	origin_field_data = data.get("originLoadingExperience", {}) or {}
+	if url_field_data.get("metrics"):
+		result["field_data"] = url_field_data
+		result["field_data_scope"] = "URL"
+	elif origin_field_data.get("metrics"):
+		result["field_data"] = origin_field_data
+		result["field_data_scope"] = "Origin"
+	else:
+		result["field_data"] = {}
+		result["field_data_scope"] = None
 
 	return result
 
