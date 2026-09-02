@@ -221,9 +221,9 @@ def get_reference_data(metric_data, metric, device, category, scope):
     if scope == "Selected category":
         scoped = reference_data[reference_data["category"] == category].copy()
         if len(scoped) >= 20:
-            return scoped, f"{category} {device} sites"
-        return reference_data, f"all {device} sites; selected category sample was too small"
-    return reference_data, f"all {device} sites"
+            return scoped, f"{category} {device} pages"
+        return reference_data, f"all {device} pages; selected category sample was too small"
+    return reference_data, f"all {device} pages"
 
 
 def clean_number(value):
@@ -426,31 +426,37 @@ def render_benchmark_card(row):
 
 def render_benchmark_controls(metric_data, device):
     categories = available_categories(metric_data)
-    if "selected_category" not in st.session_state:
-        st.session_state.selected_category = categories[0]
-    if "comparison_scope" not in st.session_state:
-        st.session_state.comparison_scope = "All sites"
+    all_pages_label = "All audited pages"
+    comparison_group = st.selectbox(
+        "Compare with",
+        [all_pages_label, *categories],
+        key="comparison_group",
+        help="Changing the comparison updates the benchmark without rerunning the PSI audit.",
+    )
 
-    st.subheader("Comparison Settings")
-    control_col1, control_col2 = st.columns([1, 2])
-    with control_col1:
-        comparison_scope = st.radio("Benchmark group", ["All sites", "Selected category"], key="comparison_scope")
-    with control_col2:
-        selected_category = st.selectbox(
-            "Compare against category",
-            categories,
-            key="selected_category",
-            help="Only applies when Benchmark group is set to Selected category. The PSI result stays saved; only the benchmark group changes.",
-            disabled=st.session_state.comparison_scope == "All sites",
-        )
+    if comparison_group == all_pages_label:
+        category = None
+        comparison_scope = "All sites"
+    else:
+        category = comparison_group
+        comparison_scope = "Selected category"
 
-    reference_key = f"{device}|{selected_category}|{comparison_scope}"
+    reference_data, _ = get_reference_data(
+        metric_data,
+        "largest-contentful-paint",
+        device,
+        category,
+        comparison_scope,
+    )
+    st.caption(f"Benchmark sample: {len(reference_data):,} {device} page audits")
+
+    reference_key = f"{device}|{category}|{comparison_scope}"
     if st.session_state.get("reference_key") != reference_key:
         st.session_state.reference_key = reference_key
         st.session_state.pop("estimated_new_lcp", None)
         st.session_state.pop("percent_improvement", None)
 
-    return selected_category, comparison_scope
+    return category, comparison_scope
 
 
 def render_action_plan(metric_rows, limit=3):
@@ -512,7 +518,7 @@ def render_result_summary(metric_rows):
         f'<div class="recommendation-card action-card-primary"><h4>Result Summary</h4><p>{message}</p></div>',
         unsafe_allow_html=True,
     )
-def render_overview(strategy, category, reference_label, metric_rows):
+def render_overview(strategy, reference_label, metric_rows):
     primary_rows = [row for row in metric_rows if row["key"] in {"largest-contentful-paint", "cumulative-layout-shift", "INTERACTION_TO_NEXT_PAINT"}]
 
     st.subheader("Overview")
@@ -521,7 +527,7 @@ def render_overview(strategy, category, reference_label, metric_rows):
         with col:
             render_metric_tile(row)
 
-    st.caption(f"Benchmark set: {reference_label} · Selected category: {category} · Device: {strategy}")
+    st.caption(f"Benchmark set: {reference_label} · Device: {strategy}")
 
     st.markdown('<div class="overview-recs">', unsafe_allow_html=True)
     st.subheader("What to Fix First")
@@ -662,7 +668,7 @@ def load_component(metric_data, category, scope):
 
     tabs = st.tabs(["Overview", "Metric Details", "Raw Audit Data"])
     with tabs[0]:
-        render_overview(strategy, category, reference_label, metric_rows)
+        render_overview(strategy, reference_label, metric_rows)
     with tabs[1]:
         render_benchmark(metric_rows, reference_label)
     with tabs[2]:

@@ -75,8 +75,6 @@ with st.form("website_submission_form"):
     )
     submitted = st.form_submit_button("Run PSI Audit", type="primary")
 
-comparison_device = st.session_state.strategy.lower() if st.session_state.website_submitted else strategy.lower()
-category, comparison_scope = render_benchmark_controls(metric_data, comparison_device)
 
 if submitted:
     normalized_website = normalize_url(website)
@@ -105,6 +103,8 @@ if submitted:
 if st.session_state.website_submitted:
     st.divider()
     st.caption(f"Audit: {st.session_state.website} · {st.session_state.strategy}")
+    comparison_device = st.session_state.strategy.lower()
+    category, comparison_scope = render_benchmark_controls(metric_data, comparison_device)
     load_component(metric_data=metric_data, category=category, scope=comparison_scope)
 else:
     st.info("Run a PSI audit to view the dashboard.")
