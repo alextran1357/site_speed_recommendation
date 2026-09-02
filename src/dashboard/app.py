@@ -7,7 +7,7 @@ from utils.fetch_lighthouse_data import fetch_data
 st.set_page_config(
     page_title="Site Speed Insight",
     page_icon="🚀",
-    layout="wide",
+    layout="centered",
 )
 
 metric_data = load_data()
