@@ -38,6 +38,24 @@ class PlatformGuidanceTest(unittest.TestCase):
         self.assertIn("Shopify manages", guidance["owner_action"])
         self.assertIn("shopify.com", guidance["resource_url"])
 
+    def test_help_links_match_platform_and_recommended_action(self):
+        cases = [
+            ("WordPress", "lcp", "https://learn.wordpress.org/lesson/website-optimization/"),
+            ("WordPress", "images", "https://learn.wordpress.org/lesson/image-optimization/"),
+            ("Wix", "images", "https://support.wix.com/en/article/site-performance-optimizing-your-media"),
+            ("Wix", "javascript", "https://support.wix.com/en/article/site-performance-best-practices"),
+            ("Shopify", "images", "https://help.shopify.com/en/manual/online-store/web-performance/improving-web-performance"),
+            ("Squarespace", "images", "https://support.squarespace.com/hc/en-us/articles/360022529371-Reducing-your-page-size-for-faster-loading"),
+            ("Squarespace", "lcp", "https://support.squarespace.com/hc/en-us/articles/360022529371-Reducing-your-page-size-for-faster-loading"),
+            ("Squarespace", "server", "https://support.squarespace.com/hc/en-us/articles/206545657-My-site-is-loading-slowly"),
+            ("Squarespace", "javascript", "https://support.squarespace.com/hc/en-us/articles/206545657-My-site-is-loading-slowly"),
+        ]
+        for platform, fix_id, expected_url in cases:
+            with self.subTest(platform=platform, fix_id=fix_id):
+                guidance = guidance_for(platform, fix_id)
+                self.assertEqual(guidance["resource_url"], expected_url)
+                self.assertTrue(guidance["resource_label"])
+
 
 if __name__ == "__main__":
     unittest.main()

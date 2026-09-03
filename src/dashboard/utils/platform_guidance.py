@@ -11,8 +11,8 @@ PLATFORM_MARKERS = {
 
 PLATFORM_HELP = {
     "WordPress": {
-        "url": "https://developer.wordpress.org/advanced-administration/performance/optimization/",
-        "label": "WordPress performance help",
+        "url": "https://learn.wordpress.org/lesson/website-optimization/",
+        "label": "WordPress website optimization lesson",
     },
     "Shopify": {
         "url": "https://help.shopify.com/en/manual/online-store/web-performance/improving-web-performance",
@@ -25,6 +25,26 @@ PLATFORM_HELP = {
     "Squarespace": {
         "url": "https://support.squarespace.com/hc/en-us/articles/206545657-My-site-is-loading-slowly",
         "label": "Squarespace performance help",
+    },
+}
+
+
+PLATFORM_FIX_HELP = {
+    ("WordPress", "images"): {
+        "url": "https://learn.wordpress.org/lesson/image-optimization/",
+        "label": "WordPress image optimization lesson",
+    },
+    ("Wix", "images"): {
+        "url": "https://support.wix.com/en/article/site-performance-optimizing-your-media",
+        "label": "Wix image and media help",
+    },
+    ("Squarespace", "images"): {
+        "url": "https://support.squarespace.com/hc/en-us/articles/360022529371-Reducing-your-page-size-for-faster-loading",
+        "label": "Squarespace page size and image help",
+    },
+    ("Squarespace", "lcp"): {
+        "url": "https://support.squarespace.com/hc/en-us/articles/360022529371-Reducing-your-page-size-for-faster-loading",
+        "label": "Squarespace page size and image help",
     },
 }
 
@@ -187,7 +207,7 @@ def detect_platform(audits, page_url=""):
 
 def guidance_for(platform, fix_id):
     actions = PLATFORM_ACTIONS.get(platform, {}).get(fix_id) or GENERIC_ACTIONS[fix_id]
-    help_resource = PLATFORM_HELP.get(platform)
+    help_resource = PLATFORM_FIX_HELP.get((platform, fix_id), PLATFORM_HELP.get(platform))
     return {
         "owner_action": actions[0],
         "help_action": actions[1],

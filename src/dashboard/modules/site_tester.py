@@ -272,18 +272,9 @@ def inject_dashboard_styles():
             .fix-evidence {font-size: 0.78rem; color: #94a3b8 !important; margin-top: 5px;}
             .resource-links {display: flex; flex-wrap: wrap; gap: 8px 10px;}
             .resource-link.priority-link {padding: 7px 11px; border: 1px solid #60a5fa; border-radius: 6px;}
-            .secondary-fix {background: #1f2937; border: 1px solid #334155; border-radius: 7px; margin-bottom: 8px;}
-            .secondary-fix summary {display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; padding: 12px 14px; cursor: pointer;}
-            .secondary-rank {display: inline-grid; place-items: center; width: 1.5rem; height: 1.5rem; border: 1px solid #64748b; border-radius: 999px; color: #cbd5e1 !important; font-size: 0.75rem; font-weight: 800;}
-            .secondary-title {flex: 1 1 16rem; color: #f8fafc !important; font-weight: 750;}
-            .secondary-value {font-size: 1.05rem; font-weight: 850;}
-            .secondary-value.status-good {color: #34d399 !important;}
-            .secondary-value.status-watch {color: #fbbf24 !important;}
-            .secondary-value.status-poor {color: #f87171 !important;}
-            .secondary-target {font-size: 0.78rem; color: #94a3b8 !important;}
-            .secondary-body {border-top: 1px solid #334155; padding: 12px 46px 14px;}
-            .secondary-body p {margin: 0; color: #cbd5e1 !important; line-height: 1.5;}
-            .secondary-body p + p {margin-top: 8px;}
+            .priority-card.secondary-fix {padding: 18px 20px; border-color: #334155;}
+            .secondary-fix .priority-title {font-size: 1.1rem;}
+            .secondary-fix .priority-value {font-size: 2rem;}
             .resource-link {display: inline-block; margin-top: 10px; color: #93c5fd !important; font-weight: 700; text-decoration: none;}
             .resource-link:hover {text-decoration: underline;}
             [data-testid="stSelectbox"] label[data-testid="stWidgetLabel"] {display: inline-flex !important; width: fit-content !important; align-items: center; gap: 4px;}
@@ -615,11 +606,11 @@ def resource_links_for(fix, guidance, priority=False):
     if guidance["resource_url"]:
         links.append(
             f'<a class="{css_class}" href="{html.escape(guidance["resource_url"], quote=True)}" '
-            f'target="_blank" rel="noopener">Open {html.escape(guidance["resource_label"])}</a>'
+            f'target="_blank" rel="noopener">Follow these steps: {html.escape(guidance["resource_label"])}</a>'
         )
     links.append(
-        f'<a class="{css_class}" href="{html.escape(fix["url"], quote=True)}" '
-        f'target="_blank" rel="noopener">Open {html.escape(fix["label"])}</a>'
+        f'<a class="resource-link" href="{html.escape(fix["url"], quote=True)}" '
+        f'target="_blank" rel="noopener">For your developer: {html.escape(fix["label"])}</a>'
     )
     return f'<div class="resource-links">{"".join(links)}</div>'
 
@@ -836,29 +827,35 @@ def render_action_plan(result, metric_rows, field_rows, platform, limit=3):
     )
 
     if supporting:
-        st.markdown("#### Also check")
+        st.markdown("#### Next priorities")
+        st.caption("Start with the highest priority above, then work through these actions.")
         for rank, issue in enumerate(supporting, start=2):
             fix = fix_for_issue(issue, result)
             guidance = guidance_for(platform, fix["fix_id"])
-            resource_links = resource_links_for(fix, guidance)
+            resource_links = resource_links_for(fix, guidance, priority=True)
             source = "Field data" if issue["source"] == "Field" else "Lab test"
             st.markdown(
                 f"""
-                <details class="secondary-fix">
-                    <summary>
-                        <span class="secondary-rank">{rank}</span>
-                        <span class="secondary-title">{html.escape(issue_title_for(issue))}</span>
-                        <span class="secondary-value {issue['status_class']}">{html.escape(issue['Current value'])}</span>
-                        <span class="secondary-target">{html.escape(concise_target_for(issue))}</span>
-                    </summary>
-                    <div class="secondary-body">
-                        <p><strong>{html.escape(source)}:</strong> {html.escape(impact_text_for(issue))}</p>
-                        <p><strong>What you can try:</strong> {html.escape(guidance['owner_action'])}</p>
-                        <p><strong>When to get help:</strong> {html.escape(guidance['help_action'])}</p>
-                        <div class="fix-evidence"><strong>Why this was suggested:</strong> {html.escape(fix['evidence'])}</div>
-                        {resource_links}
+                <article class="priority-card secondary-fix" aria-label="Recommendation {rank}">
+                    <div class="priority-eyebrow {issue['status_class']}">Priority {rank} · {html.escape(source)} · {html.escape(issue['Status'])}</div>
+                    <h4 class="priority-title">{html.escape(issue_title_for(issue))}</h4>
+                    <div class="priority-measurement">
+                        <span class="priority-value {issue['status_class']}">{html.escape(issue['Current value'])}</span>
+                        <span class="priority-target">{html.escape(concise_target_for(issue))}</span>
                     </div>
-                </details>
+                    <div class="priority-impact {issue['status_class']}">{html.escape(impact_text_for(issue))}</div>
+                    <div class="priority-fix">
+                        <div class="priority-fix-label">What you can try</div>
+                        <div class="priority-fix-title">{html.escape(fix['title'])}</div>
+                        <p>{html.escape(guidance['owner_action'])}</p>
+                        <div class="priority-help">
+                            <div class="priority-fix-label">When to get help</div>
+                            <p>{html.escape(guidance['help_action'])}</p>
+                        </div>
+                        <div class="fix-evidence"><strong>Why this was suggested:</strong> {html.escape(fix['evidence'])}</div>
+                    </div>
+                    {resource_links}
+                </article>
                 """,
                 unsafe_allow_html=True,
             )
