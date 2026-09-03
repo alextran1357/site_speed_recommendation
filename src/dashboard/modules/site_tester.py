@@ -6,6 +6,7 @@ import pandas as pd
 import streamlit as st
 
 from utils.predict import predict
+from utils.platform_guidance import PLATFORM_OPTIONS, guidance_for
 
 
 PRIMARY_METRICS = [
@@ -169,6 +170,11 @@ SECONDARY_METRICS = [
 
 METRIC_DEFINITIONS = PRIMARY_METRICS + SECONDARY_METRICS
 FIELD_DATA_KEYS = {"INTERACTION_TO_NEXT_PAINT", "EXPERIMENTAL_TIME_TO_FIRST_BYTE"}
+PRIORITY_ISSUES = (
+    ("lcp", "field_largest-contentful-paint", "largest-contentful-paint"),
+    ("cls", "field_cumulative-layout-shift", "cumulative-layout-shift"),
+    ("responsiveness", "INTERACTION_TO_NEXT_PAINT", "total-blocking-time"),
+)
 
 SCENARIO_METRICS = [
     {"label": "Unused JavaScript", "key": "unused-javascript"},
@@ -194,7 +200,7 @@ def inject_dashboard_styles():
             .stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp h5, .stApp h6 {color: #e5e7eb !important;}
             .block-container {padding-top: 1.6rem; padding-bottom: 3rem;}
             [data-testid="stMarkdownContainer"] p, [data-testid="stCaptionContainer"], .small-muted {color: #cbd5e1 !important;}
-            div[data-testid="stMetric"], .benchmark-card, .recommendation-card {
+            div[data-testid="stMetric"], .benchmark-card {
                 background: #1f2937 !important;
                 border: 1px solid #334155;
                 border-radius: 8px;
@@ -204,8 +210,8 @@ def inject_dashboard_styles():
             div[data-testid="stMetric"] * {color: #f8fafc !important;}
             div[data-testid="stMetricLabel"] p {font-size: 0.86rem; color: #cbd5e1 !important;}
             div[data-testid="stMetricValue"] {font-size: 1.55rem;}
-            .benchmark-card h4, .recommendation-card h4 {margin: 0 0 8px 0; color: #f8fafc !important;}
-            .benchmark-card p, .recommendation-card p {margin: 0; color: #cbd5e1 !important; line-height: 1.5;}
+            .benchmark-card h4 {margin: 0 0 8px 0; color: #f8fafc !important;}
+            .benchmark-card p {margin: 0; color: #cbd5e1 !important; line-height: 1.5;}
             .status-good {color: #34d399 !important; font-weight: 750;}
             .status-watch {color: #fbbf24 !important; font-weight: 750;}
             .status-poor {color: #f87171 !important; font-weight: 750;}
@@ -240,12 +246,44 @@ def inject_dashboard_styles():
             .benchmark-meta {display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 12px;}
             .benchmark-meta div {background: #273449; border-radius: 6px; padding: 8px 10px; color: #f8fafc !important;}
             .benchmark-meta span {display: block; color: #cbd5e1 !important; font-size: 0.78rem;}
-            .recommendation-card {padding: 18px 20px; margin-bottom: 14px;}
-            .recommendation-card h4 {font-size: 1.05rem;}
-            .recommendation-meta {margin-bottom: 8px !important; color: #cbd5e1 !important;}
             .overview-recs {margin-top: 10px;}
-            .action-grid {display: grid; grid-template-columns: 1.25fr 1fr; gap: 14px; margin-top: 10px;}
-            .action-card-primary {border-color: #475569; background: #243244 !important;}
+            .priority-card {background: #1f2937; border: 1px solid #475569; border-radius: 8px; padding: 20px 22px; margin-bottom: 18px;}
+            .priority-eyebrow {font-size: 0.75rem; font-weight: 850; letter-spacing: 0.08em; text-transform: uppercase;}
+            .priority-eyebrow.status-good {color: #34d399 !important;}
+            .priority-eyebrow.status-watch {color: #fbbf24 !important;}
+            .priority-eyebrow.status-poor {color: #f87171 !important;}
+            .priority-title {font-size: 1.2rem; font-weight: 800; color: #f8fafc !important; margin: 4px 0 10px;}
+            .priority-measurement {display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px 14px;}
+            .priority-value {font-size: 2.5rem; line-height: 1; font-weight: 850;}
+            .priority-value.status-good {color: #34d399 !important;}
+            .priority-value.status-watch {color: #fbbf24 !important;}
+            .priority-value.status-poor {color: #f87171 !important;}
+            .priority-target {font-size: 0.9rem; color: #cbd5e1 !important;}
+            .priority-impact {font-size: 1rem; font-weight: 800; margin-top: 8px;}
+            .priority-impact.status-good {color: #34d399 !important;}
+            .priority-impact.status-watch {color: #fbbf24 !important;}
+            .priority-impact.status-poor {color: #f87171 !important;}
+            .priority-peer {font-size: 0.8rem; color: #94a3b8 !important; margin-top: 2px;}
+            .priority-fix {background: #273449; border-left: 3px solid #60a5fa; border-radius: 5px; padding: 12px 14px; margin-top: 14px;}
+            .priority-fix-label {font-size: 0.7rem; font-weight: 850; letter-spacing: 0.07em; text-transform: uppercase; color: #93c5fd !important;}
+            .priority-fix-title {font-size: 1rem; font-weight: 800; color: #f8fafc !important; margin-top: 2px;}
+            .priority-fix p {margin: 5px 0 0; color: #cbd5e1 !important; line-height: 1.45;}
+            .priority-help {border-top: 1px solid #475569; margin-top: 12px; padding-top: 12px;}
+            .fix-evidence {font-size: 0.78rem; color: #94a3b8 !important; margin-top: 5px;}
+            .resource-links {display: flex; flex-wrap: wrap; gap: 8px 10px;}
+            .resource-link.priority-link {padding: 7px 11px; border: 1px solid #60a5fa; border-radius: 6px;}
+            .secondary-fix {background: #1f2937; border: 1px solid #334155; border-radius: 7px; margin-bottom: 8px;}
+            .secondary-fix summary {display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; padding: 12px 14px; cursor: pointer;}
+            .secondary-rank {display: inline-grid; place-items: center; width: 1.5rem; height: 1.5rem; border: 1px solid #64748b; border-radius: 999px; color: #cbd5e1 !important; font-size: 0.75rem; font-weight: 800;}
+            .secondary-title {flex: 1 1 16rem; color: #f8fafc !important; font-weight: 750;}
+            .secondary-value {font-size: 1.05rem; font-weight: 850;}
+            .secondary-value.status-good {color: #34d399 !important;}
+            .secondary-value.status-watch {color: #fbbf24 !important;}
+            .secondary-value.status-poor {color: #f87171 !important;}
+            .secondary-target {font-size: 0.78rem; color: #94a3b8 !important;}
+            .secondary-body {border-top: 1px solid #334155; padding: 12px 46px 14px;}
+            .secondary-body p {margin: 0; color: #cbd5e1 !important; line-height: 1.5;}
+            .secondary-body p + p {margin-top: 8px;}
             .resource-link {display: inline-block; margin-top: 10px; color: #93c5fd !important; font-weight: 700; text-decoration: none;}
             .resource-link:hover {text-decoration: underline;}
             [data-testid="stSelectbox"] label[data-testid="stWidgetLabel"] {display: inline-flex !important; width: fit-content !important; align-items: center; gap: 4px;}
@@ -397,6 +435,8 @@ def build_metric_rows(result, metric_data, device, category, scope):
                 "key": key,
                 "raw_value": raw_value,
                 "unit": metric_def["unit"],
+                "good_threshold": metric_def["thresholds"][0],
+                "lower_is_better": metric_def["lower_is_better"],
                 "short": metric_def["short"],
                 "tier": metric_def["tier"],
                 "marker_position": marker_position_for(metric_def, raw_value),
@@ -421,25 +461,209 @@ def build_field_metric_rows(result):
                 "status_class": status_class,
                 "Status basis": metric_def["basis"],
                 "key": metric_def["key"],
+                "raw_value": raw_value,
+                "unit": metric_def["unit"],
+                "good_threshold": metric_def["thresholds"][0],
+                "lower_is_better": metric_def["lower_is_better"],
                 "short": metric_def["short"],
             }
         )
     return rows
 
 
-def priority_score(row):
-    percentile = row["Percentile vs peers"]
-    if percentile is None:
-        return -1
-    status_boost = {"Poor": 200, "Needs improvement": 100, "Good": 0}.get(row["Status"], 0)
-    return status_boost + percentile
+def issue_priority_score(issue):
+    severity = {"Poor": 2, "Needs improvement": 1}.get(issue["Status"], 0)
+    target = issue["good_threshold"]
+    value = issue["raw_value"]
+    distance = (value / target) if value is not None and target else 0
+    field_priority = 1 if issue["source"] == "Field" else 0
+    return severity, field_priority, distance
 
 
-def top_opportunities(metric_rows, limit=4):
-    ranked = [row for row in metric_rows if row["Status"] != "Good"]
-    ranked.sort(key=priority_score, reverse=True)
-    return ranked[:limit]
+def build_priority_issues(metric_rows, field_rows):
+    lab_by_key = {row["key"]: row for row in metric_rows}
+    field_by_key = {row["key"]: row for row in field_rows}
+    issues = []
 
+    for issue_id, field_key, lab_key in PRIORITY_ISSUES:
+        field_row = field_by_key.get(field_key)
+        lab_row = lab_by_key.get(lab_key)
+        if field_row and field_row["Status"] in {"Poor", "Needs improvement"}:
+            measured_row = field_row
+            source = "Field"
+        elif lab_row and lab_row["Status"] in {"Poor", "Needs improvement"}:
+            measured_row = lab_row
+            source = "Lab"
+        else:
+            continue
+
+        issue = dict(measured_row)
+        issue["issue_id"] = issue_id
+        issue["source"] = source
+        issue["lab_row"] = lab_row
+        issues.append(issue)
+
+    issues.sort(key=issue_priority_score, reverse=True)
+    return issues
+
+
+def strongest_positive_value(result, keys):
+    values = [clean_number(result.get(key)) for key in keys]
+    return max((value for value in values if value is not None and value > 0), default=None)
+
+
+def fix_for_issue(issue, result):
+    issue_id = issue["issue_id"]
+
+    if issue_id == "lcp":
+        render_savings = clean_number(result.get("render-blocking-resources_savings_ms"))
+        if render_savings and render_savings > 0:
+            return {
+                "fix_id": "render_blocking",
+                "title": "Remove render-blocking resources",
+                "detail": "Defer non-critical scripts and styles so the largest visible element can render sooner.",
+                "evidence": f"PSI estimates up to {format_value(render_savings, 'ms')} of potential savings.",
+                "url": "https://developer.chrome.com/docs/performance/insights/render-blocking",
+                "label": "technical render-blocking guide",
+            }
+
+        image_savings = strongest_positive_value(
+            result,
+            ("uses-responsive-images_savings_bytes", "uses-optimized-images_savings_bytes"),
+        )
+        if image_savings:
+            return {
+                "fix_id": "images",
+                "title": "Optimize image delivery",
+                "detail": "Resize and compress the page's large images, especially the image used as the LCP element.",
+                "evidence": f"PSI estimates up to {format_value(image_savings, 'bytes')} of potential transfer savings.",
+                "url": "https://web.dev/learn/performance/image-performance",
+                "label": "technical image guide",
+            }
+
+        server_latency = clean_number(result.get("network-server-latency"))
+        if server_latency and server_latency > 800:
+            return {
+                "fix_id": "server",
+                "title": "Improve the initial server response",
+                "detail": "Review hosting, caching, redirects, CDN behavior, and backend work before the page begins rendering.",
+                "evidence": f"PSI measured {format_value(server_latency, 'ms')} of server latency.",
+                "url": "https://web.dev/articles/optimize-ttfb",
+                "label": "server response guide",
+            }
+
+        return {
+            "fix_id": "lcp",
+            "title": "Inspect and optimize the LCP element",
+            "detail": "Identify the element Lighthouse reports as LCP, then reduce the time required to download and render it.",
+            "evidence": "Recommended from the failing LCP measurement; no larger PSI savings estimate was available.",
+            "url": "https://web.dev/articles/optimize-lcp",
+            "label": "LCP optimization guide",
+        }
+
+    if issue_id == "cls":
+        return {
+            "fix_id": "cls",
+            "title": "Reserve space for elements that shift",
+            "detail": "Set dimensions for images, ads, embeds, and late-loading interface elements, then inspect Lighthouse's layout-shift culprits.",
+            "evidence": "Recommended from the failing CLS measurement.",
+            "url": "https://web.dev/articles/optimize-cls",
+            "label": "CLS optimization guide",
+        }
+
+    unused_javascript_bytes = clean_number(result.get("unused-javascript_savings_bytes"))
+    unused_javascript_ms = clean_number(result.get("unused-javascript_savings_ms"))
+    if unused_javascript_bytes or unused_javascript_ms:
+        evidence = (
+            f"PSI estimates about {format_value(unused_javascript_bytes, 'bytes')} of removable code."
+            if unused_javascript_bytes
+            else f"PSI estimates up to {format_value(unused_javascript_ms, 'ms')} of potential savings."
+        )
+        return {
+            "fix_id": "javascript",
+            "title": "Reduce unused JavaScript",
+            "detail": "Remove unused code and defer non-critical scripts to reduce long main-thread tasks.",
+            "evidence": evidence,
+            "url": "https://developer.chrome.com/docs/lighthouse/performance/unused-javascript",
+            "label": "unused JavaScript guidance",
+        }
+
+    script_time = clean_number(result.get("mainthread_scriptEvaluation"))
+    if script_time and script_time > 200:
+        return {
+            "fix_id": "javascript",
+            "title": "Break up JavaScript execution",
+            "detail": "Split long tasks and delay non-essential work so the main thread can respond sooner.",
+            "evidence": f"PSI measured {format_value(script_time, 'ms')} of script evaluation work.",
+            "url": "https://web.dev/articles/optimize-long-tasks",
+            "label": "long-task optimization guide",
+        }
+
+    return {
+        "fix_id": "javascript",
+        "title": "Investigate long main-thread tasks",
+        "detail": "Use the Lighthouse diagnostics to find JavaScript work that blocks the page from responding.",
+        "evidence": "Recommended from the failing INP or TBT measurement.",
+        "url": "https://web.dev/articles/optimize-inp",
+        "label": "INP optimization guide",
+    }
+
+
+def resource_links_for(fix, guidance, priority=False):
+    css_class = "resource-link priority-link" if priority else "resource-link"
+    links = []
+    if guidance["resource_url"]:
+        links.append(
+            f'<a class="{css_class}" href="{html.escape(guidance["resource_url"], quote=True)}" '
+            f'target="_blank" rel="noopener">Open {html.escape(guidance["resource_label"])}</a>'
+        )
+    links.append(
+        f'<a class="{css_class}" href="{html.escape(fix["url"], quote=True)}" '
+        f'target="_blank" rel="noopener">Open {html.escape(fix["label"])}</a>'
+    )
+    return f'<div class="resource-links">{"".join(links)}</div>'
+
+
+def render_platform_selector(result):
+    detected_platform = result.get("detected_platform")
+    if st.session_state.get("website_platform") not in PLATFORM_OPTIONS:
+        st.session_state.website_platform = (
+            detected_platform if detected_platform in PLATFORM_OPTIONS else "Other / Not sure"
+        )
+
+    platform = st.selectbox(
+        "Your website platform",
+        PLATFORM_OPTIONS,
+        key="website_platform",
+        help="Changing this updates the recommended actions only. It does not change the audit or benchmark results.",
+    )
+    if detected_platform in PLATFORM_OPTIONS:
+        if platform == detected_platform:
+            st.caption(
+                f"Suggested from the audit: {detected_platform}. Change this if it is incorrect; only the instructions will update."
+            )
+        else:
+            st.caption(
+                f"The audit suggested {detected_platform}; using {platform} for the instructions. Audit results are unchanged."
+            )
+    else:
+        st.caption(
+            "The audit could not confidently identify the platform. Choose one to tailor the instructions; audit results are unchanged."
+        )
+    return platform
+
+
+def issue_title_for(issue):
+    if issue["issue_id"] == "responsiveness" and issue["source"] == "Lab":
+        return "Responsiveness risk (TBT)"
+    return metric_title(issue)
+
+
+def lab_benchmark_context_for(issue):
+    lab_row = issue.get("lab_row")
+    if not lab_row or lab_row["Percentile vs peers"] is None:
+        return "Lab benchmark position unavailable"
+    return f"Lab result is worse than {lab_row['Percentile vs peers']:.0f}% of benchmark pages"
 
 
 def target_text_for(row):
@@ -454,7 +678,29 @@ def target_text_for(row):
 
 
 def metric_title(row):
+    if row["short"].lower() in row["Metric"].lower():
+        return row["Metric"]
     return f"{row['Metric']} ({row['short']})"
+
+
+def concise_target_for(row):
+    comparison = "≤" if row["lower_is_better"] else "≥"
+    return f"Target {comparison} {format_value(row['good_threshold'], row['unit'])}"
+
+
+def impact_text_for(row):
+    value = row["raw_value"]
+    target = row["good_threshold"]
+    if value is None or not target:
+        return row["Status"]
+    if row["lower_is_better"] and value > target:
+        qualifier = "slower" if row["unit"] == "ms" else "above"
+        return f"{value / target:.1f}× {qualifier} than the healthy target"
+    if not row["lower_is_better"] and value < target:
+        if row["unit"] == "score_percent":
+            return f"{(target - value) * 100:.0f} points below the healthy target"
+        return "Below the healthy target"
+    return "Within the healthy target"
 
 
 def render_data_source_header(title, context):
@@ -549,25 +795,41 @@ def render_benchmark_controls(metric_data, device):
     return category, comparison_scope
 
 
-def render_action_plan(metric_rows, limit=3):
-    priorities = top_opportunities(metric_rows, limit=limit)
-    if not priorities:
-        st.info("The main PageSpeed metrics are within their target ranges for this audit.")
+def render_action_plan(result, metric_rows, field_rows, platform, limit=3):
+    issues = build_priority_issues(metric_rows, field_rows)[:limit]
+    if not issues:
+        st.info("Field Core Web Vitals and the current lab diagnostics are within their healthy targets.")
         return
 
-    primary = priorities[0]
-    supporting = priorities[1:]
-    resource_url = primary.get("resource_url") or "https://web.dev/learn/performance"
-    resource_label = primary.get("resource_label") or "web.dev performance guide"
-    peer_text = "peer percentile unavailable" if primary["Percentile vs peers"] is None else f"{primary['Percentile vs peers']:.0f}th peer percentile"
+    primary = issues[0]
+    supporting = issues[1:]
+    primary_fix = fix_for_issue(primary, result)
+    primary_guidance = guidance_for(platform, primary_fix["fix_id"])
+    primary_links = resource_links_for(primary_fix, primary_guidance, priority=True)
+    source_text = "Real-user field data" if primary["source"] == "Field" else "Current Lighthouse lab test"
 
     st.markdown(
         f"""
-        <div class="recommendation-card action-card-primary">
-            <h4>Fix first: {metric_title(primary)}</h4>
-            <p class="recommendation-meta"><span class="{primary['status_class']}">{primary['Status']}</span> · {primary['Current value']} now · target {target_text_for(primary).replace('Target: ', '')} · {peer_text}</p>
-            <p>{primary['Recommendation']}</p>
-            <a class="resource-link" href="{resource_url}" target="_blank">Open {resource_label}</a>
+        <div class="priority-card">
+            <div class="priority-eyebrow {primary['status_class']}">Highest priority · {html.escape(source_text)}</div>
+            <div class="priority-title">{html.escape(issue_title_for(primary))}</div>
+            <div class="priority-measurement">
+                <span class="priority-value {primary['status_class']}">{html.escape(primary['Current value'])}</span>
+                <span class="priority-target">{html.escape(concise_target_for(primary))}</span>
+            </div>
+            <div class="priority-impact {primary['status_class']}">{html.escape(impact_text_for(primary))}</div>
+            <div class="priority-peer">{html.escape(lab_benchmark_context_for(primary))}</div>
+            <div class="priority-fix">
+                <div class="priority-fix-label">What you can try</div>
+                <div class="priority-fix-title">{html.escape(primary_fix['title'])}</div>
+                <p>{html.escape(primary_guidance['owner_action'])}</p>
+                <div class="priority-help">
+                    <div class="priority-fix-label">When to get help</div>
+                    <p>{html.escape(primary_guidance['help_action'])}</p>
+                </div>
+                <div class="fix-evidence"><strong>Why this was suggested:</strong> {html.escape(primary_fix['evidence'])}</div>
+            </div>
+            {primary_links}
         </div>
         """,
         unsafe_allow_html=True,
@@ -575,39 +837,33 @@ def render_action_plan(metric_rows, limit=3):
 
     if supporting:
         st.markdown("#### Also check")
-        for row in supporting:
-            row_resource_url = row.get("resource_url") or "https://web.dev/learn/performance"
-            row_resource_label = row.get("resource_label") or "web.dev performance guide"
+        for rank, issue in enumerate(supporting, start=2):
+            fix = fix_for_issue(issue, result)
+            guidance = guidance_for(platform, fix["fix_id"])
+            resource_links = resource_links_for(fix, guidance)
+            source = "Field data" if issue["source"] == "Field" else "Lab test"
             st.markdown(
                 f"""
-                <div class="recommendation-card">
-                    <h4>{metric_title(row)}</h4>
-                    <p class="recommendation-meta"><span class="{row['status_class']}">{row['Status']}</span> · {row['Current value']} now · target {target_text_for(row).replace('Target: ', '')}</p>
-                    <p>{row['Recommendation']}</p>
-                    <a class="resource-link" href="{row_resource_url}" target="_blank">Open {row_resource_label}</a>
-                </div>
+                <details class="secondary-fix">
+                    <summary>
+                        <span class="secondary-rank">{rank}</span>
+                        <span class="secondary-title">{html.escape(issue_title_for(issue))}</span>
+                        <span class="secondary-value {issue['status_class']}">{html.escape(issue['Current value'])}</span>
+                        <span class="secondary-target">{html.escape(concise_target_for(issue))}</span>
+                    </summary>
+                    <div class="secondary-body">
+                        <p><strong>{html.escape(source)}:</strong> {html.escape(impact_text_for(issue))}</p>
+                        <p><strong>What you can try:</strong> {html.escape(guidance['owner_action'])}</p>
+                        <p><strong>When to get help:</strong> {html.escape(guidance['help_action'])}</p>
+                        <div class="fix-evidence"><strong>Why this was suggested:</strong> {html.escape(fix['evidence'])}</div>
+                        {resource_links}
+                    </div>
+                </details>
                 """,
                 unsafe_allow_html=True,
             )
 
 
-
-def render_result_summary(metric_rows):
-    priorities = top_opportunities(metric_rows, limit=1)
-    if not priorities:
-        message = "Core Web Vitals and supporting PageSpeed metrics are within target for this audit."
-        st.markdown(f'<div class="recommendation-card"><h4>Result Summary</h4><p>{message}</p></div>', unsafe_allow_html=True)
-        return
-
-    top = priorities[0]
-    message = (
-        f"This page is mainly limited by <strong>{metric_title(top)}</strong>. "
-        f"Start there before tuning lower-priority metrics."
-    )
-    st.markdown(
-        f'<div class="recommendation-card action-card-primary"><h4>Result Summary</h4><p>{message}</p></div>',
-        unsafe_allow_html=True,
-    )
 def render_overview(result, strategy, reference_label, metric_rows):
     lab_rows = [
         row
@@ -641,13 +897,8 @@ def render_overview(result, strategy, reference_label, metric_rows):
 
     st.markdown('<div class="overview-recs">', unsafe_allow_html=True)
     st.subheader("What to Fix First")
-    st.caption("Recommendations use the current lab audit and its benchmark set.")
-    lab_action_rows = [
-        row
-        for row in metric_rows
-        if row["key"] not in FIELD_DATA_KEYS
-    ]
-    render_action_plan(lab_action_rows, limit=3)
+    platform = render_platform_selector(result)
+    render_action_plan(result, metric_rows, field_rows, platform, limit=3)
     st.markdown("</div>", unsafe_allow_html=True)
 
 
@@ -680,7 +931,10 @@ def render_benchmark(metric_rows, reference_label):
         for row in metric_rows
     ]
     display_df = pd.DataFrame(display_rows).drop(
-        columns=["key", "raw_value", "unit", "short", "status_class", "marker_position", "track_class", "track_style"]
+        columns=[
+            "key", "raw_value", "unit", "good_threshold", "lower_is_better", "short",
+            "status_class", "marker_position", "track_class", "track_style",
+        ]
     )
     st.dataframe(display_df, use_container_width=True, hide_index=True)
 

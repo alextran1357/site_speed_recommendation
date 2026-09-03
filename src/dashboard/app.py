@@ -3,6 +3,7 @@ import streamlit as st
 from modules.site_tester import load_component, normalize_url, render_benchmark_controls
 from utils.data_loader import load_data
 from utils.fetch_lighthouse_data import fetch_data
+from utils.platform_guidance import PLATFORM_OPTIONS
 
 st.set_page_config(
     page_title="Site Speed Insight",
@@ -113,6 +114,10 @@ if submitted:
             st.session_state.website = normalized_website
             st.session_state.last_website_input = normalized_website
             st.session_state.strategy = strategy
+            detected_platform = result.get("detected_platform")
+            st.session_state.website_platform = (
+                detected_platform if detected_platform in PLATFORM_OPTIONS else "Other / Not sure"
+            )
             st.session_state.website_submitted = True
             st.rerun()
 

@@ -5,6 +5,8 @@ Docstring for util.fetch_lighthouse_data
 import requests
 import streamlit as st
 
+from utils.platform_guidance import detect_platform
+
 API_KEY = st.secrets["API_KEY"]
 
 def extract_simple_numeric_values(result, audits, keys):
@@ -178,5 +180,6 @@ def fetch_data(url, strategy, api_key=API_KEY):
 
     cleaned = extract_useful_fields(data)
     result = extract_all_features(cleaned)
+    result["detected_platform"] = detect_platform(cleaned.get("audits", {}), url)
     print(f"Completed url: {url}")
     return result
