@@ -236,7 +236,6 @@ def inject_dashboard_styles():
             .meaning-label {font-size: 0.72rem; font-weight: 850; letter-spacing: 0.08em; text-transform: uppercase; color: #94a3b8 !important;}
             .meaning-title {font-size: 1.1rem; font-weight: 800; color: #f8fafc !important; margin: 3px 0 6px;}
             .meaning-body {margin: 0; color: #e2e8f0 !important; line-height: 1.5;}
-            .meaning-context {margin: 8px 0 0; font-size: 0.78rem; color: #94a3b8 !important; line-height: 1.4;}
             .benchmark-card {padding: 16px 18px; margin-bottom: 14px;}
             .benchmark-header {display: flex; justify-content: space-between; gap: 16px; align-items: baseline;}
             .benchmark-title {font-size: 1.08rem; font-weight: 750; color: #f8fafc !important;}
@@ -670,14 +669,8 @@ def lab_benchmark_context_for(issue):
 
 
 def target_text_for(row):
-    metric_targets = {
-        "largest-contentful-paint": "Target: 2.5s or less",
-        "field_largest-contentful-paint": "Target: 2.5s or less",
-        "cumulative-layout-shift": "Target: 0.10 or less",
-        "field_cumulative-layout-shift": "Target: 0.10 or less",
-        "INTERACTION_TO_NEXT_PAINT": "Target: 200ms or less",
-    }
-    return metric_targets.get(row["key"], row["Status basis"])
+    direction = "or less" if row["lower_is_better"] else "or more"
+    return f"Target: {format_value(row['good_threshold'], row['unit'])} {direction}"
 
 
 def metric_title(row):
@@ -718,7 +711,7 @@ def render_data_source_header(title, context):
     )
 
 
-def results_interpretation(lab_rows, field_rows, field_scope, strategy):
+def results_interpretation(lab_rows, field_rows):
     lab_available = [row for row in lab_rows if row["Status"] != "Unavailable"]
     field_available = [row for row in field_rows if row["Status"] != "Unavailable"]
     issue_statuses = {"Poor", "Needs improvement"}
@@ -764,30 +757,17 @@ def results_interpretation(lab_rows, field_rows, field_scope, strategy):
         title = "Available lab and real-user results look healthy"
         body = "No immediate performance issue stands out; test again after major site changes."
 
-    context_parts = [f"Lab: one simulated {strategy.lower()} test"]
-    if field_scope == "URL":
-        context_parts.append("Field: this URL, previous 28 days, all devices")
-    elif field_scope == "Origin":
-        context_parts.append("Field: whole site origin, previous 28 days, all devices")
-    elif field_available:
-        context_parts.append("Field: page or site scope not reported")
-    else:
-        context_parts.append("Field: unavailable for this URL and its site origin")
-    if field_available:
-        context_parts.append(f"Coverage: {len(field_available)} of 3 Core Web Vitals")
-
-    return {"tone": tone, "title": title, "body": body, "context": " · ".join(context_parts)}
+    return {"tone": tone, "title": title, "body": body}
 
 
-def render_results_interpretation(lab_rows, field_rows, field_scope, strategy):
-    interpretation = results_interpretation(lab_rows, field_rows, field_scope, strategy)
+def render_results_interpretation(lab_rows, field_rows):
+    interpretation = results_interpretation(lab_rows, field_rows)
     st.html(
         f"""
         <section class="meaning-card {interpretation['tone']}" aria-labelledby="results-meaning-title">
             <div class="meaning-label">What this means</div>
             <h3 class="meaning-title" id="results-meaning-title">{html.escape(interpretation['title'])}</h3>
             <p class="meaning-body">{html.escape(interpretation['body'])}</p>
-            <p class="meaning-context">{html.escape(interpretation['context'])}</p>
         </section>
         """
     )
@@ -928,7 +908,6 @@ def render_action_plan(result, metric_rows, field_rows, platform, limit=3):
     for rank, issue in enumerate(issues, start=1):
         if rank == 2:
             st.markdown("#### Next priorities")
-            st.caption("Start with the highest priority above, then work through these actions.")
         render_recommendation_card(issue, result, platform, rank)
 
 
@@ -963,7 +942,7 @@ def render_overview(result, strategy, reference_label, metric_rows):
         with col:
             render_metric_tile(row)
 
-    render_results_interpretation(lab_rows, field_rows, field_scope, strategy)
+    render_results_interpretation(lab_rows, field_rows)
     st.html('<h2 class="recommendations-heading">What to Fix First</h2>')
     platform = render_platform_selector(result)
     render_action_plan(result, metric_rows, field_rows, platform, limit=3)

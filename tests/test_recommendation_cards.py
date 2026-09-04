@@ -44,28 +44,28 @@ class RecommendationCardsTest(unittest.TestCase):
         interpretation = site_tester.results_interpretation(
             [{"Status": "Poor"}, {"Status": "Needs improvement"}],
             [{"Status": "Good"}, {"Status": "Good"}, {"Status": "Good"}],
-            "URL",
-            "Mobile",
         )
 
         self.assertEqual(interpretation["tone"], "mixed")
         self.assertEqual(interpretation["title"], "Real users look better than this lab test")
         self.assertIn("Trust the 28-day field data", interpretation["body"])
-        self.assertIn("one simulated mobile test", interpretation["context"])
-        self.assertIn("this URL, previous 28 days", interpretation["context"])
-        self.assertIn("Coverage: 3 of 3 Core Web Vitals", interpretation["context"])
+        self.assertNotIn("context", interpretation)
 
     def test_interpretation_does_not_treat_missing_field_data_as_healthy(self):
         interpretation = site_tester.results_interpretation(
             [{"Status": "Poor"}],
             [{"Status": "Unavailable"}],
-            None,
-            "Desktop",
         )
 
         self.assertEqual(interpretation["tone"], "caution")
         self.assertEqual(interpretation["title"], "Only the lab test is available")
         self.assertIn("not enough real-user data", interpretation["body"])
+
+    def test_overview_targets_stay_concise(self):
+        row = {"lower_is_better": True, "good_threshold": 200, "unit": "ms"}
+
+        self.assertEqual(site_tester.target_text_for(row), "Target: 200 ms or less")
+        self.assertNotIn("needs improvement", site_tester.target_text_for(row))
 
     def test_interpretation_follows_metrics_and_precedes_recommendations(self):
         app = AppTest.from_function(recommendation_preview).run(timeout=20)

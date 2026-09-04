@@ -18,7 +18,7 @@ if "website_submitted" not in st.session_state:
 
 st.title("Site Speed Insight")
 st.caption(
-    "Run a PageSpeed Insights audit, then compare the result against different site categories without rerunning the test."
+    "Run a PageSpeed Insights audit, understand the results, and see what to fix first."
 )
 
 submitted = False
