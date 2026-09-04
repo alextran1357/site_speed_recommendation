@@ -9,6 +9,7 @@ from streamlit.testing.v1 import AppTest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src" / "dashboard"))
 
 from modules import site_tester
+from utils.platform_guidance import PLATFORM_HELP, PLATFORM_OPTIONS
 
 
 def recommendation_preview():
@@ -18,14 +19,13 @@ def recommendation_preview():
         build_metric_rows,
         inject_dashboard_styles,
         render_action_plan,
+        render_platform_selector,
     )
     from utils.data_loader import load_data
-    from utils.platform_guidance import PLATFORM_OPTIONS
 
     st.set_page_config(layout="centered")
     inject_dashboard_styles()
     source = st.selectbox("Measurement source", ["Field", "Lab"])
-    platform = st.selectbox("Website platform", PLATFORM_OPTIONS)
     result = {
         "field_largest-contentful-paint": 9000,
         "field_cumulative-layout-shift": 0.3,
@@ -36,6 +36,8 @@ def recommendation_preview():
         "total-blocking-time": 4600,
         "unused-javascript_savings_bytes": 1394606,
     }
+    result["detected_platform"] = "WordPress"
+    platform = render_platform_selector(result)
     metric_rows = (
         build_metric_rows(result, load_data(), "mobile", None, "All sites")
         if source == "Lab" else []
@@ -76,11 +78,12 @@ class RecommendationCardsTest(unittest.TestCase):
                 self.assertIn('class="priority-fix-title"', card)
                 self.assertIn("What you can try", card)
                 self.assertIn("When to get help", card)
-                self.assertIn("Follow these steps:", card)
                 self.assertIn("For your developer:", card)
                 self.assertIn('rel="noopener"', card)
         self.assertIn("Reserve space for elements that shift", cards[0])
         self.assertIn("Investigate long main-thread tasks", cards[1])
+        self.assertNotIn("Follow these steps:", cards[0])
+        self.assertIn("Follow these steps: Manage WordPress plugins", cards[1])
 
     def test_cards_bypass_markdown(self):
         rows = site_tester.build_field_metric_rows({"field_largest-contentful-paint": 9000})
@@ -102,14 +105,43 @@ class RecommendationCardsTest(unittest.TestCase):
         app.selectbox[1].set_value("Shopify")
         app.run(timeout=20)
         self.assertFalse(app.exception)
-        cards = app.get("html")
+        cards = [item for item in app.get("html") if "<article " in item.proto.body]
         self.assertEqual(len(cards), 3)
         for card in cards:
             self.assertFalse(card.proto.unsafe_allow_javascript)
             self.assertIn('class="priority-fix"', card.proto.body)
-            self.assertIn("Shopify performance help", card.proto.body)
+            self.assertNotIn("Shopify performance help", card.proto.body)
         self.assertIn("Responsiveness risk (TBT)", cards[0].proto.body)
         self.assertFalse(any("<article " in item.value for item in app.markdown))
+
+    def test_general_cms_help_is_shown_once_below_selector(self):
+        app = AppTest.from_function(recommendation_preview).run(timeout=20)
+        for platform in PLATFORM_OPTIONS:
+            with self.subTest(platform=platform):
+                app.selectbox[1].set_value(platform).run(timeout=20)
+                self.assertFalse(app.exception)
+                output = [item.proto.body for item in app.get("html")]
+                cards = [body for body in output if "<article " in body]
+                shared_help = [body for body in output if 'class="platform-help"' in body]
+                self.assertEqual(len(cards), 3)
+                for card in cards:
+                    self.assertIn("For your developer:", card)
+                if platform in PLATFORM_HELP:
+                    general_url = PLATFORM_HELP[platform]["url"]
+                    self.assertEqual(len(shared_help), 1)
+                    self.assertEqual("".join(output).count(general_url), 1)
+                    self.assertTrue(all(general_url not in card for card in cards))
+                    self.assertIn(f"General {platform} performance guide", shared_help[0])
+                    elements = list(app.main)
+                    selector_index = next(
+                        index for index, element in enumerate(elements)
+                        if element.type == "selectbox" and element.key == "website_platform"
+                    )
+                    self.assertEqual(elements[selector_index + 1].type, "html")
+                    self.assertEqual(elements[selector_index + 1].proto.body, shared_help[0])
+                    self.assertLess(output.index(shared_help[0]), output.index(cards[0]))
+                else:
+                    self.assertFalse(shared_help)
 
 
 if __name__ == "__main__":

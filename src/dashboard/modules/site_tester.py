@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
-from utils.platform_guidance import PLATFORM_OPTIONS, guidance_for
+from utils.platform_guidance import PLATFORM_HELP, PLATFORM_OPTIONS, guidance_for
 
 
 PRIMARY_METRICS = [
@@ -269,13 +269,15 @@ def inject_dashboard_styles():
             .priority-fix p {margin: 5px 0 0; color: #cbd5e1 !important; line-height: 1.45;}
             .priority-help {border-top: 1px solid #475569; margin-top: 12px; padding-top: 12px;}
             .fix-evidence {font-size: 0.78rem; color: #94a3b8 !important; margin-top: 5px;}
-            .resource-links {display: flex; flex-wrap: wrap; gap: 8px 10px;}
-            .resource-link.priority-link {padding: 7px 11px; border: 1px solid #60a5fa; border-radius: 6px;}
+            .resource-links {display: flex; flex-wrap: wrap; align-items: flex-start; gap: 8px 10px;}
+            .resource-link.priority-link {border-color: #60a5fa;}
             .priority-card.secondary-fix {padding: 18px 20px; border-color: #334155;}
             .secondary-fix .priority-title {font-size: 1.1rem;}
             .secondary-fix .priority-value {font-size: 2rem;}
-            .resource-link {display: inline-block; margin-top: 10px; color: #93c5fd !important; font-weight: 700; text-decoration: none;}
-            .resource-link:hover {text-decoration: underline;}
+            .resource-link {display: inline-flex; align-items: center; box-sizing: border-box; max-width: 100%; min-height: 44px; padding: 9px 12px; border: 1px solid #64748b; border-radius: 6px; margin-top: 10px; color: #93c5fd !important; font-weight: 700; text-decoration: none; overflow-wrap: anywhere;}
+            .resource-link:hover {background: #334155; text-decoration: underline;}
+            .resource-link:focus-visible {outline: 2px solid #93c5fd; outline-offset: 3px;}
+            .platform-help .resource-link {margin-top: 0; font-size: 0.875rem; font-weight: 600;}
             [data-testid="stSelectbox"] label[data-testid="stWidgetLabel"] {display: inline-flex !important; width: fit-content !important; align-items: center; gap: 4px;}
             [data-testid="stSelectbox"] label[data-testid="stWidgetLabel"] > div {flex: 0 0 auto !important; margin-left: 0 !important;}
             [data-testid="stSelectbox"] [data-testid="stTooltipIcon"] {margin-left: 0 !important;}
@@ -595,12 +597,11 @@ def fix_for_issue(issue, result):
     }
 
 
-def resource_links_for(fix, guidance, priority=False):
-    css_class = "resource-link priority-link" if priority else "resource-link"
+def resource_links_for(fix, guidance):
     links = []
     if guidance["resource_url"]:
         links.append(
-            f'<a class="{css_class}" href="{html.escape(guidance["resource_url"], quote=True)}" '
+            f'<a class="resource-link priority-link" href="{html.escape(guidance["resource_url"], quote=True)}" '
             f'target="_blank" rel="noopener">Follow these steps: {html.escape(guidance["resource_label"])}</a>'
         )
     links.append(
@@ -623,6 +624,14 @@ def render_platform_selector(result):
         key="website_platform",
         help="Changing this updates the recommended actions only. It does not change the audit or benchmark results.",
     )
+    platform_help = PLATFORM_HELP.get(platform)
+    if platform_help:
+        st.html(
+            f'<div class="platform-help">'
+            f'<a class="resource-link" href="{html.escape(platform_help["url"], quote=True)}" '
+            f'target="_blank" rel="noopener">General {html.escape(platform)} performance guide</a>'
+            '</div>'
+        )
     if detected_platform in PLATFORM_OPTIONS:
         if platform == detected_platform:
             st.caption(
@@ -784,7 +793,7 @@ def render_benchmark_controls(metric_data, device):
 def render_recommendation_card(issue, result, platform, rank):
     fix = fix_for_issue(issue, result)
     guidance = guidance_for(platform, fix["fix_id"])
-    resource_links = resource_links_for(fix, guidance, priority=True)
+    resource_links = resource_links_for(fix, guidance)
     is_primary = rank == 1
     css_class = "priority-card" if is_primary else "priority-card secondary-fix"
     if is_primary:

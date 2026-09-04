@@ -30,13 +30,29 @@ PLATFORM_HELP = {
 
 
 PLATFORM_FIX_HELP = {
+    ("WordPress", "javascript"): {
+        "url": "https://wordpress.org/documentation/article/manage-plugins/",
+        "label": "Manage WordPress plugins",
+    },
     ("WordPress", "images"): {
         "url": "https://learn.wordpress.org/lesson/image-optimization/",
         "label": "WordPress image optimization lesson",
     },
+    ("Shopify", "javascript"): {
+        "url": "https://help.shopify.com/en/manual/online-store/themes/customizing-themes/apps",
+        "label": "Manage Shopify app embeds",
+    },
+    ("Shopify", "lcp"): {
+        "url": "https://help.shopify.com/en/manual/online-store/themes/theme-structure/sections-and-blocks",
+        "label": "Edit or hide Shopify theme sections",
+    },
     ("Wix", "images"): {
         "url": "https://support.wix.com/en/article/site-performance-optimizing-your-media",
         "label": "Wix image and media help",
+    },
+    ("Wix", "javascript"): {
+        "url": "https://support.wix.com/en/article/site-performance-removing-unused-javascript",
+        "label": "Wix unused JavaScript guidance",
     },
     ("Squarespace", "images"): {
         "url": "https://support.squarespace.com/hc/en-us/articles/360022529371-Reducing-your-page-size-for-faster-loading",
@@ -207,7 +223,8 @@ def detect_platform(audits, page_url=""):
 
 def guidance_for(platform, fix_id):
     actions = PLATFORM_ACTIONS.get(platform, {}).get(fix_id) or GENERIC_ACTIONS[fix_id]
-    help_resource = PLATFORM_FIX_HELP.get((platform, fix_id), PLATFORM_HELP.get(platform))
+    # General platform help is shown once for the whole plan, not as a task-specific guide.
+    help_resource = PLATFORM_FIX_HELP.get((platform, fix_id))
     return {
         "owner_action": actions[0],
         "help_action": actions[1],
