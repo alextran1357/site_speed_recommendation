@@ -229,6 +229,14 @@ def inject_dashboard_styles():
             .data-source-header .data-source-title {font-size: 1.1rem; line-height: 1.25; font-weight: 800; color: #f8fafc !important;}
             .data-source-header .data-source-context {margin-top: 1px; font-size: 0.78rem; line-height: 1.35; color: #94a3b8 !important;}
             .metric-section-divider {border-top: 1px solid #334155; margin: 2px 0 8px;}
+            .meaning-card {background: #172033; border: 1px solid #475569; border-left: 4px solid #60a5fa; border-radius: 8px; padding: 16px 18px; margin: 24px 0 0;}
+            .meaning-card.good {border-left-color: #34d399;}
+            .meaning-card.caution {border-left-color: #fbbf24;}
+            .meaning-card.poor {border-left-color: #f87171;}
+            .meaning-label {font-size: 0.72rem; font-weight: 850; letter-spacing: 0.08em; text-transform: uppercase; color: #94a3b8 !important;}
+            .meaning-title {font-size: 1.1rem; font-weight: 800; color: #f8fafc !important; margin: 3px 0 6px;}
+            .meaning-body {margin: 0; color: #e2e8f0 !important; line-height: 1.5;}
+            .meaning-context {margin: 8px 0 0; font-size: 0.78rem; color: #94a3b8 !important; line-height: 1.4;}
             .benchmark-card {padding: 16px 18px; margin-bottom: 14px;}
             .benchmark-header {display: flex; justify-content: space-between; gap: 16px; align-items: baseline;}
             .benchmark-title {font-size: 1.08rem; font-weight: 750; color: #f8fafc !important;}
@@ -245,7 +253,7 @@ def inject_dashboard_styles():
             .benchmark-meta {display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 12px;}
             .benchmark-meta div {background: #273449; border-radius: 6px; padding: 8px 10px; color: #f8fafc !important;}
             .benchmark-meta span {display: block; color: #cbd5e1 !important; font-size: 0.78rem;}
-            .overview-recs {margin-top: 10px;}
+            .recommendations-heading {font-size: 2rem; line-height: 1.2; font-weight: 800; color: #f8fafc !important; margin: 28px 0 12px;}
             .priority-card {background: #1f2937; border: 1px solid #475569; border-radius: 8px; padding: 20px 22px; margin-bottom: 18px;}
             .priority-eyebrow {font-size: 0.75rem; font-weight: 850; letter-spacing: 0.08em; text-transform: uppercase;}
             .priority-eyebrow.status-good {color: #34d399 !important;}
@@ -710,6 +718,81 @@ def render_data_source_header(title, context):
     )
 
 
+def results_interpretation(lab_rows, field_rows, field_scope, strategy):
+    lab_available = [row for row in lab_rows if row["Status"] != "Unavailable"]
+    field_available = [row for row in field_rows if row["Status"] != "Unavailable"]
+    issue_statuses = {"Poor", "Needs improvement"}
+    lab_has_issues = any(row["Status"] in issue_statuses for row in lab_available)
+    field_has_issues = any(row["Status"] in issue_statuses for row in field_available)
+
+    if not field_available:
+        tone = "caution"
+        title = "Only the lab test is available"
+        condition = "found performance problems" if lab_has_issues else "looks healthy"
+        body = (
+            f"This simulated test {condition}; treat it as a diagnostic snapshot because "
+            "there is not enough real-user data to confirm what visitors usually experience."
+        )
+    elif not lab_available:
+        tone = "poor" if field_has_issues else "good"
+        title = "Use the available real-user results"
+        condition = "include performance problems" if field_has_issues else "look healthy"
+        body = (
+            f"The available 28-day real-user metrics {condition}; run another lab audit "
+            "if you need diagnostic clues for a specific page load."
+        )
+    elif lab_has_issues and not field_has_issues:
+        tone = "mixed"
+        title = "Real users look better than this lab test"
+        body = (
+            "Trust the 28-day field data for typical visitor experience; use this Lighthouse result "
+            "as a diagnostic clue for possible improvements."
+        )
+    elif field_has_issues and not lab_has_issues:
+        tone = "poor"
+        title = "Real users are seeing problems the lab test missed"
+        body = (
+            "Prioritize the 28-day field results because one simulated run may not reproduce real devices, "
+            "networks, or interactions."
+        )
+    elif lab_has_issues:
+        tone = "poor"
+        title = "Both lab and real-user data show problems"
+        body = "Start with the recommendations below, which prioritize the strongest measured issues."
+    else:
+        tone = "good"
+        title = "Available lab and real-user results look healthy"
+        body = "No immediate performance issue stands out; test again after major site changes."
+
+    context_parts = [f"Lab: one simulated {strategy.lower()} test"]
+    if field_scope == "URL":
+        context_parts.append("Field: this URL, previous 28 days, all devices")
+    elif field_scope == "Origin":
+        context_parts.append("Field: whole site origin, previous 28 days, all devices")
+    elif field_available:
+        context_parts.append("Field: page or site scope not reported")
+    else:
+        context_parts.append("Field: unavailable for this URL and its site origin")
+    if field_available:
+        context_parts.append(f"Coverage: {len(field_available)} of 3 Core Web Vitals")
+
+    return {"tone": tone, "title": title, "body": body, "context": " · ".join(context_parts)}
+
+
+def render_results_interpretation(lab_rows, field_rows, field_scope, strategy):
+    interpretation = results_interpretation(lab_rows, field_rows, field_scope, strategy)
+    st.html(
+        f"""
+        <section class="meaning-card {interpretation['tone']}" aria-labelledby="results-meaning-title">
+            <div class="meaning-label">What this means</div>
+            <h3 class="meaning-title" id="results-meaning-title">{html.escape(interpretation['title'])}</h3>
+            <p class="meaning-body">{html.escape(interpretation['body'])}</p>
+            <p class="meaning-context">{html.escape(interpretation['context'])}</p>
+        </section>
+        """
+    )
+
+
 def render_metric_tile(row):
     st.markdown(
         f"""
@@ -880,11 +963,10 @@ def render_overview(result, strategy, reference_label, metric_rows):
         with col:
             render_metric_tile(row)
 
-    st.markdown('<div class="overview-recs">', unsafe_allow_html=True)
-    st.subheader("What to Fix First")
+    render_results_interpretation(lab_rows, field_rows, field_scope, strategy)
+    st.html('<h2 class="recommendations-heading">What to Fix First</h2>')
     platform = render_platform_selector(result)
     render_action_plan(result, metric_rows, field_rows, platform, limit=3)
-    st.markdown("</div>", unsafe_allow_html=True)
 
 
 def render_benchmark(metric_rows, reference_label):
@@ -1019,28 +1101,43 @@ def render_scenario_planner(result, device, lcp_reference_data, pred_value):
 
 
 def render_raw_audit(result):
-    st.subheader("Raw Audit Data")
     st.caption("Advanced view of the extracted PageSpeed Insights fields used by the dashboard.")
     rows = [{"Field": key, "Value": value} for key, value in sorted(result.items())]
     display_df = pd.DataFrame(rows, columns=["Field", "Value"]).astype({"Value": "string"})
     st.dataframe(display_df, width="stretch", hide_index=True)
 
 
-def load_component(metric_data, category, scope):
+def load_component(metric_data, category=None, scope=None):
+    """Render results; category and scope remain optional for safe Streamlit hot reloads."""
     result = st.session_state.result
     strategy = st.session_state.strategy
     device = strategy.lower()
 
-    _, reference_label = get_reference_data(metric_data, "largest-contentful-paint", device, category, scope)
-    metric_rows = build_metric_rows(result, metric_data, device, category, scope)
+    _, overview_reference_label = get_reference_data(
+        metric_data, "largest-contentful-paint", device, None, "All sites"
+    )
+    overview_rows = build_metric_rows(result, metric_data, device, None, "All sites")
 
-    tabs = st.tabs(["Overview", "Metric Details", "Raw Audit Data"])
+    tabs = st.tabs(["Overview", "Detailed results"])
     with tabs[0]:
-        render_overview(result, strategy, reference_label, metric_rows)
+        render_overview(result, strategy, overview_reference_label, overview_rows)
     with tabs[1]:
-        render_benchmark(metric_rows, reference_label)
-    with tabs[2]:
-        render_raw_audit(result)
+        category, comparison_scope = render_benchmark_controls(metric_data, device)
+        _, detail_reference_label = get_reference_data(
+            metric_data,
+            "largest-contentful-paint",
+            device,
+            category,
+            comparison_scope,
+        )
+        detail_rows = (
+            overview_rows
+            if category is None
+            else build_metric_rows(result, metric_data, device, category, comparison_scope)
+        )
+        render_benchmark(detail_rows, detail_reference_label)
+        with st.expander("Advanced: raw audit data", expanded=False):
+            render_raw_audit(result)
 
 
 

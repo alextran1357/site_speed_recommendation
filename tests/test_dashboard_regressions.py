@@ -111,6 +111,40 @@ class BenchmarkRegressionTest(unittest.TestCase):
                 completed_app.session_state[key] = app.session_state[key]
             app = completed_app.run(timeout=20)
             self.assertFalse(app.exception)
+            self.assertEqual([tab.label for tab in app.tabs], ["Overview", "Detailed results"])
+            self.assertEqual(
+                [widget.key for widget in app.tabs[0].get("selectbox")],
+                ["website_platform"],
+            )
+            self.assertEqual(
+                [widget.key for widget in app.tabs[1].get("selectbox")],
+                ["comparison_group"],
+            )
+            raw_sections = [
+                section
+                for section in app.tabs[1].get("expander")
+                if section.label == "Advanced: raw audit data"
+            ]
+            self.assertEqual(len(raw_sections), 1)
+            self.assertFalse(raw_sections[0].proto.expanded)
+            self.assertEqual(len(raw_sections[0].get("dataframe")), 1)
+            self.assertFalse(app.tabs[0].get("dataframe"))
+
+            overview_cards = [
+                item.proto.body
+                for item in app.tabs[0].get("html")
+                if "<article " in item.proto.body
+            ]
+            comparison = app.selectbox(key="comparison_group")
+            comparison.set_value(comparison.options[1]).run(timeout=20)
+            self.assertEqual(
+                overview_cards,
+                [
+                    item.proto.body
+                    for item in app.tabs[0].get("html")
+                    if "<article " in item.proto.body
+                ],
+            )
             app.selectbox(key="website_platform").set_value("Wix").run(timeout=20)
             self.assertFalse(app.exception)
             self.assertEqual(app.session_state["result"], audit)

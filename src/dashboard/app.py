@@ -1,6 +1,6 @@
 import streamlit as st
 
-from modules.site_tester import inject_dashboard_styles, load_component, normalize_url, render_benchmark_controls
+from modules.site_tester import inject_dashboard_styles, load_component, normalize_url
 from utils.data_loader import load_data
 from utils.fetch_lighthouse_data import fetch_data
 from utils.platform_guidance import PLATFORM_OPTIONS
@@ -81,9 +81,7 @@ if submitted:
 
 if st.session_state.website_submitted:
     metric_data = load_data()
-    comparison_device = st.session_state.strategy.lower()
-    category, comparison_scope = render_benchmark_controls(metric_data, comparison_device)
-    load_component(metric_data=metric_data, category=category, scope=comparison_scope)
+    load_component(metric_data=metric_data, category=None, scope="All sites")
 else:
     st.info("Run a PSI audit to view the dashboard.")
 

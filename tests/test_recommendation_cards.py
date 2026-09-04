@@ -15,11 +15,8 @@ from utils.platform_guidance import PLATFORM_HELP, PLATFORM_OPTIONS
 def recommendation_preview():
     import streamlit as st
     from modules.site_tester import (
-        build_field_metric_rows,
-        build_metric_rows,
         inject_dashboard_styles,
-        render_action_plan,
-        render_platform_selector,
+        load_component,
     )
     from utils.data_loader import load_data
 
@@ -37,15 +34,63 @@ def recommendation_preview():
         "unused-javascript_savings_bytes": 1394606,
     }
     result["detected_platform"] = "WordPress"
-    platform = render_platform_selector(result)
-    metric_rows = (
-        build_metric_rows(result, load_data(), "mobile", None, "All sites")
-        if source == "Lab" else []
-    )
-    render_action_plan(result, metric_rows, build_field_metric_rows(result), platform)
+    st.session_state.result = result
+    st.session_state.strategy = "Mobile"
+    load_component(load_data())
 
 
 class RecommendationCardsTest(unittest.TestCase):
+    def test_interpretation_explains_when_field_data_is_better_than_lab_data(self):
+        interpretation = site_tester.results_interpretation(
+            [{"Status": "Poor"}, {"Status": "Needs improvement"}],
+            [{"Status": "Good"}, {"Status": "Good"}, {"Status": "Good"}],
+            "URL",
+            "Mobile",
+        )
+
+        self.assertEqual(interpretation["tone"], "mixed")
+        self.assertEqual(interpretation["title"], "Real users look better than this lab test")
+        self.assertIn("Trust the 28-day field data", interpretation["body"])
+        self.assertIn("one simulated mobile test", interpretation["context"])
+        self.assertIn("this URL, previous 28 days", interpretation["context"])
+        self.assertIn("Coverage: 3 of 3 Core Web Vitals", interpretation["context"])
+
+    def test_interpretation_does_not_treat_missing_field_data_as_healthy(self):
+        interpretation = site_tester.results_interpretation(
+            [{"Status": "Poor"}],
+            [{"Status": "Unavailable"}],
+            None,
+            "Desktop",
+        )
+
+        self.assertEqual(interpretation["tone"], "caution")
+        self.assertEqual(interpretation["title"], "Only the lab test is available")
+        self.assertIn("not enough real-user data", interpretation["body"])
+
+    def test_interpretation_follows_metrics_and_precedes_recommendations(self):
+        app = AppTest.from_function(recommendation_preview).run(timeout=20)
+        self.assertFalse(app.exception)
+        elements = list(app.main)
+        metric_indexes = [
+            index
+            for index, element in enumerate(elements)
+            if element.type == "markdown" and "compact-metric" in element.value
+        ]
+        meaning_index = next(
+            index
+            for index, element in enumerate(elements)
+            if element.type == "html" and "meaning-card" in element.proto.body
+        )
+        recommendations_index = next(
+            index
+            for index, element in enumerate(elements)
+            if element.type == "html"
+            and '<h2 class="recommendations-heading">What to Fix First</h2>' in element.proto.body
+        )
+
+        self.assertLess(max(metric_indexes), meaning_index)
+        self.assertLess(meaning_index, recommendations_index)
+
     def test_missing_measurements_are_not_reported_as_healthy(self):
         with patch.object(site_tester.st, "info") as info:
             site_tester.render_action_plan({}, [], [], "Other / Not sure")
