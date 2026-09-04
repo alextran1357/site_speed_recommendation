@@ -5,7 +5,6 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
-from utils.predict import predict
 from utils.platform_guidance import PLATFORM_OPTIONS, guidance_for
 
 
@@ -296,14 +295,20 @@ def normalize_url(url):
 
 
 def available_categories(metric_data):
-    data = pd.concat(metric_data["largest-contentful-paint"].values(), ignore_index=True)
-    return sorted(category for category in data["category"].dropna().unique() if category != "null")
+    categories = {
+        category
+        for data in metric_data["largest-contentful-paint"].values()
+        for category in data["category"].dropna().unique()
+        if category != "null"
+    }
+    return sorted(categories)
 
 
 def get_reference_data(metric_data, metric, device, category, scope):
-    reference_data = metric_data[metric][device].copy()
+    """Return benchmark data for read-only use; callers must not mutate it."""
+    reference_data = metric_data[metric][device]
     if scope == "Selected category":
-        scoped = reference_data[reference_data["category"] == category].copy()
+        scoped = reference_data[reference_data["category"] == category]
         if len(scoped) >= 20:
             return scoped, f"{category} {device} pages"
         return reference_data, f"all {device} pages; selected category sample was too small"
@@ -389,8 +394,6 @@ def marker_position_for(metric_def, value):
     value = clean_number(value)
     if value is None:
         return 0
-    if metric_def["lower_is_better"]:
-        return int(np.clip((value / metric_def["scale_max"]) * 100, 0, 100))
     return int(np.clip((value / metric_def["scale_max"]) * 100, 0, 100))
 
 
@@ -512,7 +515,6 @@ def fix_for_issue(issue, result):
             return {
                 "fix_id": "render_blocking",
                 "title": "Remove render-blocking resources",
-                "detail": "Defer non-critical scripts and styles so the largest visible element can render sooner.",
                 "evidence": f"PSI estimates up to {format_value(render_savings, 'ms')} of potential savings.",
                 "url": "https://developer.chrome.com/docs/performance/insights/render-blocking",
                 "label": "technical render-blocking guide",
@@ -526,7 +528,6 @@ def fix_for_issue(issue, result):
             return {
                 "fix_id": "images",
                 "title": "Optimize image delivery",
-                "detail": "Resize and compress the page's large images, especially the image used as the LCP element.",
                 "evidence": f"PSI estimates up to {format_value(image_savings, 'bytes')} of potential transfer savings.",
                 "url": "https://web.dev/learn/performance/image-performance",
                 "label": "technical image guide",
@@ -537,7 +538,6 @@ def fix_for_issue(issue, result):
             return {
                 "fix_id": "server",
                 "title": "Improve the initial server response",
-                "detail": "Review hosting, caching, redirects, CDN behavior, and backend work before the page begins rendering.",
                 "evidence": f"PSI measured {format_value(server_latency, 'ms')} of server latency.",
                 "url": "https://web.dev/articles/optimize-ttfb",
                 "label": "server response guide",
@@ -546,7 +546,6 @@ def fix_for_issue(issue, result):
         return {
             "fix_id": "lcp",
             "title": "Inspect and optimize the LCP element",
-            "detail": "Identify the element Lighthouse reports as LCP, then reduce the time required to download and render it.",
             "evidence": "Recommended from the failing LCP measurement; no larger PSI savings estimate was available.",
             "url": "https://web.dev/articles/optimize-lcp",
             "label": "LCP optimization guide",
@@ -556,7 +555,6 @@ def fix_for_issue(issue, result):
         return {
             "fix_id": "cls",
             "title": "Reserve space for elements that shift",
-            "detail": "Set dimensions for images, ads, embeds, and late-loading interface elements, then inspect Lighthouse's layout-shift culprits.",
             "evidence": "Recommended from the failing CLS measurement.",
             "url": "https://web.dev/articles/optimize-cls",
             "label": "CLS optimization guide",
@@ -573,7 +571,6 @@ def fix_for_issue(issue, result):
         return {
             "fix_id": "javascript",
             "title": "Reduce unused JavaScript",
-            "detail": "Remove unused code and defer non-critical scripts to reduce long main-thread tasks.",
             "evidence": evidence,
             "url": "https://developer.chrome.com/docs/lighthouse/performance/unused-javascript",
             "label": "unused JavaScript guidance",
@@ -584,7 +581,6 @@ def fix_for_issue(issue, result):
         return {
             "fix_id": "javascript",
             "title": "Break up JavaScript execution",
-            "detail": "Split long tasks and delay non-essential work so the main thread can respond sooner.",
             "evidence": f"PSI measured {format_value(script_time, 'ms')} of script evaluation work.",
             "url": "https://web.dev/articles/optimize-long-tasks",
             "label": "long-task optimization guide",
@@ -593,7 +589,6 @@ def fix_for_issue(issue, result):
     return {
         "fix_id": "javascript",
         "title": "Investigate long main-thread tasks",
-        "detail": "Use the Lighthouse diagnostics to find JavaScript work that blocks the page from responding.",
         "evidence": "Recommended from the failing INP or TBT measurement.",
         "url": "https://web.dev/articles/optimize-inp",
         "label": "INP optimization guide",
@@ -786,79 +781,63 @@ def render_benchmark_controls(metric_data, device):
     return category, comparison_scope
 
 
+def render_recommendation_card(issue, result, platform, rank):
+    fix = fix_for_issue(issue, result)
+    guidance = guidance_for(platform, fix["fix_id"])
+    resource_links = resource_links_for(fix, guidance, priority=True)
+    is_primary = rank == 1
+    css_class = "priority-card" if is_primary else "priority-card secondary-fix"
+    if is_primary:
+        source = "Real-user field data" if issue["source"] == "Field" else "Current Lighthouse lab test"
+        eyebrow = f"Highest priority · {source}"
+        peer_context = f'<div class="priority-peer">{html.escape(lab_benchmark_context_for(issue))}</div>'
+    else:
+        source = "Field data" if issue["source"] == "Field" else "Lab test"
+        eyebrow = f"Priority {rank} · {source} · {issue['Status']}"
+        peer_context = ""
+
+    # These cards are HTML, not Markdown; optional sections must not become code blocks.
+    st.html(
+        f"""
+        <article class="{css_class}" aria-label="Recommendation {rank}">
+            <div class="priority-eyebrow {issue['status_class']}">{html.escape(eyebrow)}</div>
+            <h4 class="priority-title">{html.escape(issue_title_for(issue))}</h4>
+            <div class="priority-measurement">
+                <span class="priority-value {issue['status_class']}">{html.escape(issue['Current value'])}</span>
+                <span class="priority-target">{html.escape(concise_target_for(issue))}</span>
+            </div>
+            <div class="priority-impact {issue['status_class']}">{html.escape(impact_text_for(issue))}</div>
+            {peer_context}
+            <div class="priority-fix">
+                <div class="priority-fix-label">What you can try</div>
+                <div class="priority-fix-title">{html.escape(fix['title'])}</div>
+                <p>{html.escape(guidance['owner_action'])}</p>
+                <div class="priority-help">
+                    <div class="priority-fix-label">When to get help</div>
+                    <p>{html.escape(guidance['help_action'])}</p>
+                </div>
+                <div class="fix-evidence"><strong>Why this was suggested:</strong> {html.escape(fix['evidence'])}</div>
+            </div>
+            {resource_links}
+        </article>
+        """
+    )
+
+
 def render_action_plan(result, metric_rows, field_rows, platform, limit=3):
     issues = build_priority_issues(metric_rows, field_rows)[:limit]
     if not issues:
-        st.info("Field Core Web Vitals and the current lab diagnostics are within their healthy targets.")
+        st.info(
+            "No above-target priority issues were found in the available measurements. "
+            "Unavailable measurements are not a passing result."
+        )
         return
 
-    primary = issues[0]
-    supporting = issues[1:]
-    primary_fix = fix_for_issue(primary, result)
-    primary_guidance = guidance_for(platform, primary_fix["fix_id"])
-    primary_links = resource_links_for(primary_fix, primary_guidance, priority=True)
-    source_text = "Real-user field data" if primary["source"] == "Field" else "Current Lighthouse lab test"
-
-    st.markdown(
-        f"""
-        <div class="priority-card">
-            <div class="priority-eyebrow {primary['status_class']}">Highest priority · {html.escape(source_text)}</div>
-            <div class="priority-title">{html.escape(issue_title_for(primary))}</div>
-            <div class="priority-measurement">
-                <span class="priority-value {primary['status_class']}">{html.escape(primary['Current value'])}</span>
-                <span class="priority-target">{html.escape(concise_target_for(primary))}</span>
-            </div>
-            <div class="priority-impact {primary['status_class']}">{html.escape(impact_text_for(primary))}</div>
-            <div class="priority-peer">{html.escape(lab_benchmark_context_for(primary))}</div>
-            <div class="priority-fix">
-                <div class="priority-fix-label">What you can try</div>
-                <div class="priority-fix-title">{html.escape(primary_fix['title'])}</div>
-                <p>{html.escape(primary_guidance['owner_action'])}</p>
-                <div class="priority-help">
-                    <div class="priority-fix-label">When to get help</div>
-                    <p>{html.escape(primary_guidance['help_action'])}</p>
-                </div>
-                <div class="fix-evidence"><strong>Why this was suggested:</strong> {html.escape(primary_fix['evidence'])}</div>
-            </div>
-            {primary_links}
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    if supporting:
-        st.markdown("#### Next priorities")
-        st.caption("Start with the highest priority above, then work through these actions.")
-        for rank, issue in enumerate(supporting, start=2):
-            fix = fix_for_issue(issue, result)
-            guidance = guidance_for(platform, fix["fix_id"])
-            resource_links = resource_links_for(fix, guidance, priority=True)
-            source = "Field data" if issue["source"] == "Field" else "Lab test"
-            st.markdown(
-                f"""
-                <article class="priority-card secondary-fix" aria-label="Recommendation {rank}">
-                    <div class="priority-eyebrow {issue['status_class']}">Priority {rank} · {html.escape(source)} · {html.escape(issue['Status'])}</div>
-                    <h4 class="priority-title">{html.escape(issue_title_for(issue))}</h4>
-                    <div class="priority-measurement">
-                        <span class="priority-value {issue['status_class']}">{html.escape(issue['Current value'])}</span>
-                        <span class="priority-target">{html.escape(concise_target_for(issue))}</span>
-                    </div>
-                    <div class="priority-impact {issue['status_class']}">{html.escape(impact_text_for(issue))}</div>
-                    <div class="priority-fix">
-                        <div class="priority-fix-label">What you can try</div>
-                        <div class="priority-fix-title">{html.escape(fix['title'])}</div>
-                        <p>{html.escape(guidance['owner_action'])}</p>
-                        <div class="priority-help">
-                            <div class="priority-fix-label">When to get help</div>
-                            <p>{html.escape(guidance['help_action'])}</p>
-                        </div>
-                        <div class="fix-evidence"><strong>Why this was suggested:</strong> {html.escape(fix['evidence'])}</div>
-                    </div>
-                    {resource_links}
-                </article>
-                """,
-                unsafe_allow_html=True,
-            )
+    for rank, issue in enumerate(issues, start=1):
+        if rank == 2:
+            st.markdown("#### Next priorities")
+            st.caption("Start with the highest priority above, then work through these actions.")
+        render_recommendation_card(issue, result, platform, rank)
 
 
 def render_overview(result, strategy, reference_label, metric_rows):
@@ -933,7 +912,7 @@ def render_benchmark(metric_rows, reference_label):
             "status_class", "marker_position", "track_class", "track_style",
         ]
     )
-    st.dataframe(display_df, use_container_width=True, hide_index=True)
+    st.dataframe(display_df, width="stretch", hide_index=True)
 
 
 def percentile_for(reference_data, metric, value):
@@ -951,6 +930,8 @@ def percentile_for(reference_data, metric, value):
 
 
 def render_scenario_planner(result, device, lcp_reference_data, pred_value):
+    from utils.predict import predict
+
     st.subheader("What-if Improvement Planner")
     st.caption("Explore how LCP might change if resource issues moved closer to better-performing peers. This is a planning estimate, not a guaranteed PSI result.")
 
@@ -1032,12 +1013,11 @@ def render_raw_audit(result):
     st.subheader("Raw Audit Data")
     st.caption("Advanced view of the extracted PageSpeed Insights fields used by the dashboard.")
     rows = [{"Field": key, "Value": value} for key, value in sorted(result.items())]
-    st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+    display_df = pd.DataFrame(rows, columns=["Field", "Value"]).astype({"Value": "string"})
+    st.dataframe(display_df, width="stretch", hide_index=True)
 
 
 def load_component(metric_data, category, scope):
-    inject_dashboard_styles()
-
     result = st.session_state.result
     strategy = st.session_state.strategy
     device = strategy.lower()

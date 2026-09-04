@@ -1,13 +1,8 @@
-'''
-Docstring for util.fetch_lighthouse_data
-
-'''
+"""Fetch a PageSpeed audit and extract the fields used by the dashboard."""
 import requests
 import streamlit as st
 
 from utils.platform_guidance import detect_platform
-
-API_KEY = st.secrets["API_KEY"]
 
 def extract_simple_numeric_values(result, audits, keys):
     for k in keys:
@@ -42,22 +37,6 @@ def extract_resource_summary(result, audits):
         result[f"{prefix}_bytes"] = item.get("transferSize")
         result[f"{prefix}_requests"] = item.get("requestCount")
 
-    return result
-
-    """
-    From 'third-party-summary', pull total transfer + requests for third-party.
-    """
-    tps = audits.get("third-party-summary", {}).get("details", {})
-    items = tps.get("items", [])
-    total_transfer = 0
-    total_requests = 0
-
-    for item in items:
-        total_transfer += item.get("transferSize", 0) or 0
-        total_requests += item.get("requestCount", 0) or 0
-
-    result["third_party_transfer_bytes"] = total_transfer or None
-    result["third_party_requests"] = total_requests or None
     return result
 
 def extract_mainthread_breakdown(result, audits):
@@ -118,9 +97,6 @@ def extract_all_features(data):
 		"unminified-javascript",
 		"network-server-latency",
 	]
-	cache_type = [
-		"cache-insight",
-	]
 	performance_score = data.get("performance_score")
 	result["performance_score"] = performance_score
 	result["field_data_scope"] = data.get("field_data_scope")
@@ -157,7 +133,9 @@ def extract_useful_fields(data):
 
 	return result
 
-def fetch_data(url, strategy, api_key=API_KEY):
+def fetch_data(url, strategy, api_key=None):
+    if api_key is None:
+        api_key = st.secrets["API_KEY"]
     api_url = "https://pagespeedonline.googleapis.com/pagespeedonline/v5/runPagespeed"
 
     print("Calling PageSpeed API...")
@@ -169,8 +147,9 @@ def fetch_data(url, strategy, api_key=API_KEY):
             timeout=120,
         )
         data = r.json()
-    except (requests.RequestException, ValueError) as error:
-        print(f"ERROR: {error}")
+    except (requests.RequestException, ValueError):
+        # Request exceptions can include the URL and its API key.
+        print("PageSpeed request failed.")
         return {"error": "PageSpeed Insights could not complete the request."}
 
     if not r.ok:

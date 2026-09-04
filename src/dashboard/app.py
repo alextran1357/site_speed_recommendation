@@ -1,6 +1,6 @@
 import streamlit as st
 
-from modules.site_tester import load_component, normalize_url, render_benchmark_controls
+from modules.site_tester import inject_dashboard_styles, load_component, normalize_url, render_benchmark_controls
 from utils.data_loader import load_data
 from utils.fetch_lighthouse_data import fetch_data
 from utils.platform_guidance import PLATFORM_OPTIONS
@@ -11,49 +11,7 @@ st.set_page_config(
     layout="centered",
 )
 
-metric_data = load_data()
-st.markdown(
-    """
-    <style>
-        .stApp,
-        [data-testid="stAppViewContainer"],
-        [data-testid="stHeader"],
-        [data-testid="stToolbar"],
-        [data-testid="stSidebar"] {
-            background: #111827 !important;
-        }
-        .stApp,
-        .stApp p,
-        .stApp label,
-        .stApp span,
-        .stApp div,
-        .stApp h1,
-        .stApp h2,
-        .stApp h3,
-        .stApp h4,
-        .stApp h5,
-        .stApp h6 {
-            color: #e5e7eb !important;
-        }
-        .stCaption,
-        [data-testid="stCaptionContainer"],
-        [data-testid="stMarkdownContainer"] p {
-            color: #cbd5e1 !important;
-        }
-        div[data-baseweb="input"] input,
-        div[data-baseweb="select"] > div,
-        textarea {
-            background: #1f2937 !important;
-            color: #f9fafb !important;
-            border-color: #475569 !important;
-        }
-        div[role="radiogroup"] label span {
-            color: #e5e7eb !important;
-        }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
+inject_dashboard_styles()
 
 if "website_submitted" not in st.session_state:
     st.session_state.website_submitted = False
@@ -72,7 +30,7 @@ if st.session_state.website_submitted:
             icon="✅",
         )
     with action_col:
-        if st.button("Run another audit", use_container_width=True):
+        if st.button("Run another audit", width="stretch"):
             st.session_state.website_submitted = False
             st.rerun()
 else:
@@ -122,6 +80,7 @@ if submitted:
             st.rerun()
 
 if st.session_state.website_submitted:
+    metric_data = load_data()
     comparison_device = st.session_state.strategy.lower()
     category, comparison_scope = render_benchmark_controls(metric_data, comparison_device)
     load_component(metric_data=metric_data, category=category, scope=comparison_scope)

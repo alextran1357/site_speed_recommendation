@@ -4,7 +4,7 @@ import joblib
 import pandas as pd
 
 
-MODEL_PATH = Path("src/dashboard/models")
+MODEL_PATH = Path(__file__).resolve().parents[1] / "models"
 
 FEATURE_COLUMNS = [
     "total-byte-weight",

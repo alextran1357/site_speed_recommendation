@@ -1,9 +1,10 @@
-import pandas as pd
-import streamlit as st
 from pathlib import Path
 
+import pandas as pd
+import streamlit as st
 
-DATA_PATH = Path("src/dashboard/data")
+
+DATA_PATH = Path(__file__).resolve().parents[1] / "data"
 
 METRIC_FILES = {
     "performance_score": "performance_score_data.csv",
@@ -33,16 +34,16 @@ def load_data():
     metric_data = {}
 
     for metric, file_name in METRIC_FILES.items():
-        data = pd.read_csv(DATA_PATH / file_name)
-        data["strategy"] = data["strategy"].str.lower()
+        data = pd.read_csv(DATA_PATH / file_name, dtype={"category": "category", "strategy": "category"})
+        data["strategy"] = data["strategy"].str.lower().astype("category")
 
         if metric in CLIP_QUANTILES:
             upper = data[metric].quantile(CLIP_QUANTILES[metric])
             data[metric] = data[metric].clip(0, upper)
 
         metric_data[metric] = {
-            "desktop": data[data["strategy"] == "desktop"].copy(),
-            "mobile": data[data["strategy"] == "mobile"].copy(),
+            "desktop": data[data["strategy"] == "desktop"],
+            "mobile": data[data["strategy"] == "mobile"],
         }
 
     return metric_data
