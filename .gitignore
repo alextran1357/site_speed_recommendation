@@ -315,6 +315,7 @@ streamlit-storage
 work-tmp
 # Local checkout of streamlit.wiki for agent knowledge uploads:
 agent-wiki
+AGENTS.md
 
 # Data Files
 **/uber-raw-data-sep14.csv
