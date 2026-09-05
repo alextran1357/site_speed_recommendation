@@ -1,4 +1,6 @@
 """Fetch a PageSpeed audit and extract the fields used by the dashboard."""
+import math
+
 import requests
 import streamlit as st
 
@@ -75,6 +77,41 @@ def extract_opportunities(result, audits):
     return result
 
 
+def extract_insights(result, audits):
+    """Read Lighthouse 13 evidence without treating time and byte savings alike."""
+    # Lighthouse's insight adapter exposes metricSavings and details.debugData:
+    # https://github.com/GoogleChrome/lighthouse/blob/v13.0.0/core/audits/insights/insight-audit.js
+    fields = {
+        "render-blocking-insight": (
+            "render-blocking-insight_lcp_savings_ms", ("metricSavings", "LCP"),
+        ),
+        "image-delivery-insight": (
+            "image-delivery-insight_savings_bytes", ("details", "debugData", "wastedBytes"),
+        ),
+        "document-latency-insight": (
+            "document-latency-insight_server_response_ms",
+            ("details", "debugData", "serverResponseTime"),
+        ),
+    }
+    for audit_id, (result_key, path) in fields.items():
+        if audit_id not in audits:
+            continue
+        # Keep unavailable new evidence explicit so old audits cannot override it.
+        result[result_key] = None
+        audit = audits[audit_id]
+        if not isinstance(audit, dict) or audit.get("scoreDisplayMode") in {
+            "error", "notApplicable", "manual",
+        } or audit.get("errorMessage"):
+            continue
+        value = audit
+        for key in path:
+            value = value.get(key) if isinstance(value, dict) else None
+        if (isinstance(value, (int, float)) and not isinstance(value, bool)
+                and math.isfinite(value) and value >= 0):
+            result[result_key] = value
+    return result
+
+
 def extract_all_features(data):
 	result = {}
 	audits = data.get("audits", {}) or {}
@@ -106,6 +143,7 @@ def extract_all_features(data):
 	result = extract_resource_summary(result, audits)
 	result = extract_mainthread_breakdown(result, audits)
 	result = extract_opportunities(result, audits)
+	result = extract_insights(result, audits)
 
 	return result
 

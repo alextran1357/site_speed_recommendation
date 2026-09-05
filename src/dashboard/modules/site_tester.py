@@ -519,7 +519,10 @@ def fix_for_issue(issue, result):
     issue_id = issue["issue_id"]
 
     if issue_id == "lcp":
-        render_savings = clean_number(result.get("render-blocking-resources_savings_ms"))
+        render_savings = clean_number(result.get(
+            "render-blocking-insight_lcp_savings_ms",
+            result.get("render-blocking-resources_savings_ms"),
+        ))
         if render_savings and render_savings > 0:
             return {
                 "fix_id": "render_blocking",
@@ -529,10 +532,13 @@ def fix_for_issue(issue, result):
                 "label": "technical render-blocking guide",
             }
 
-        image_savings = strongest_positive_value(
-            result,
-            ("uses-responsive-images_savings_bytes", "uses-optimized-images_savings_bytes"),
-        )
+        image_savings = clean_number(result.get(
+            "image-delivery-insight_savings_bytes",
+            strongest_positive_value(
+                result,
+                ("uses-responsive-images_savings_bytes", "uses-optimized-images_savings_bytes"),
+            ),
+        ))
         if image_savings:
             return {
                 "fix_id": "images",
@@ -542,7 +548,10 @@ def fix_for_issue(issue, result):
                 "label": "technical image guide",
             }
 
-        server_latency = clean_number(result.get("network-server-latency"))
+        server_latency = clean_number(result.get(
+            "document-latency-insight_server_response_ms",
+            result.get("network-server-latency"),
+        ))
         if server_latency and server_latency > 800:
             return {
                 "fix_id": "server",
