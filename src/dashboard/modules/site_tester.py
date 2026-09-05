@@ -57,33 +57,9 @@ PRIMARY_METRICS = [
 ]
 
 FIELD_METRICS = [
-    {
-        "label": "Largest Contentful Paint",
-        "key": "field_largest-contentful-paint",
-        "short": "LCP",
-        "unit": "ms",
-        "lower_is_better": True,
-        "thresholds": (2500, 4000),
-        "basis": "Core Web Vitals: good <= 2.5s, needs improvement <= 4.0s, poor > 4.0s.",
-    },
-    {
-        "label": "Cumulative Layout Shift",
-        "key": "field_cumulative-layout-shift",
-        "short": "CLS",
-        "unit": "score",
-        "lower_is_better": True,
-        "thresholds": (0.1, 0.25),
-        "basis": "Core Web Vitals: good <= 0.10, needs improvement <= 0.25, poor > 0.25.",
-    },
-    {
-        "label": "Interaction to Next Paint",
-        "key": "INTERACTION_TO_NEXT_PAINT",
-        "short": "INP",
-        "unit": "ms",
-        "lower_is_better": True,
-        "thresholds": (200, 500),
-        "basis": "Core Web Vitals: good <= 200ms, needs improvement <= 500ms, poor > 500ms.",
-    },
+    {**PRIMARY_METRICS[0], "key": "field_largest-contentful-paint"},
+    {**PRIMARY_METRICS[1], "key": "field_cumulative-layout-shift"},
+    PRIMARY_METRICS[2].copy(),
 ]
 
 SECONDARY_METRICS = [
@@ -175,17 +151,6 @@ PRIORITY_ISSUES = (
     ("responsiveness", "INTERACTION_TO_NEXT_PAINT", "total-blocking-time"),
 )
 
-SCENARIO_METRICS = [
-    {"label": "Unused JavaScript", "key": "unused-javascript"},
-    {"label": "Total Byte Weight", "key": "total-byte-weight"},
-    {"label": "Image Bytes", "key": "resource_image_bytes"},
-    {"label": "Font Bytes", "key": "resource_font_bytes"},
-    {"label": "Unused CSS Rules", "key": "unused-css-rules"},
-    {"label": "Unused JavaScript Savings", "key": "unused-javascript_savings_bytes"},
-    {"label": "Third-Party Bytes", "key": "resource_third-party_bytes"},
-]
-
-
 def inject_dashboard_styles():
     st.markdown(
         """
@@ -199,16 +164,12 @@ def inject_dashboard_styles():
             .stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp h5, .stApp h6 {color: #e5e7eb !important;}
             .block-container {padding-top: 1.6rem; padding-bottom: 3rem;}
             [data-testid="stMarkdownContainer"] p, [data-testid="stCaptionContainer"], .small-muted {color: #cbd5e1 !important;}
-            div[data-testid="stMetric"], .benchmark-card {
+            .benchmark-card {
                 background: #1f2937 !important;
                 border: 1px solid #334155;
                 border-radius: 8px;
                 box-shadow: none;
             }
-            div[data-testid="stMetric"] {padding: 14px 16px;}
-            div[data-testid="stMetric"] * {color: #f8fafc !important;}
-            div[data-testid="stMetricLabel"] p {font-size: 0.86rem; color: #cbd5e1 !important;}
-            div[data-testid="stMetricValue"] {font-size: 1.55rem;}
             .benchmark-card h4 {margin: 0 0 8px 0; color: #f8fafc !important;}
             .benchmark-card p {margin: 0; color: #cbd5e1 !important; line-height: 1.5;}
             .status-good {color: #34d399 !important; font-weight: 750;}
@@ -331,7 +292,7 @@ def clean_number(value):
         numeric = float(value)
     except (TypeError, ValueError):
         return None
-    if math.isnan(numeric) or math.isinf(numeric):
+    if not math.isfinite(numeric):
         return None
     return numeric
 
@@ -853,12 +814,6 @@ def render_benchmark_controls(metric_data, device):
     )
     st.caption(f"Benchmark sample: {len(reference_data):,} {device} page audits")
 
-    reference_key = f"{device}|{category}|{comparison_scope}"
-    if st.session_state.get("reference_key") != reference_key:
-        st.session_state.reference_key = reference_key
-        st.session_state.pop("estimated_new_lcp", None)
-        st.session_state.pop("percent_improvement", None)
-
     return category, comparison_scope
 
 
@@ -994,100 +949,6 @@ def render_benchmark(metric_rows, reference_label):
     st.dataframe(display_df, width="stretch", hide_index=True)
 
 
-def percentile_for(reference_data, metric, value):
-    value = clean_number(value)
-    if value is None or metric not in reference_data.columns:
-        return None
-    series = pd.to_numeric(reference_data[metric], errors="coerce").dropna()
-    if series.empty:
-        return None
-    values = series.to_numpy(dtype=float)
-    lower_count = np.sum(values < value)
-    equal_count = np.sum(values == value)
-    percentile = ((lower_count + (0.5 * equal_count)) / len(values)) * 100
-    return float(np.clip(percentile, 0, 100))
-
-
-def render_scenario_planner(result, device, lcp_reference_data, pred_value):
-    from utils.predict import predict
-
-    st.subheader("What-if Improvement Planner")
-    st.caption("Explore how LCP might change if resource issues moved closer to better-performing peers. This is a planning estimate, not a guaranteed PSI result.")
-
-    col1, col2 = st.columns(2)
-    col1.metric("Current measured LCP", format_value(result.get("largest-contentful-paint"), "ms"))
-    if st.session_state.get("estimated_new_lcp") is not None:
-        col2.metric("Scenario LCP estimate", format_value(st.session_state.estimated_new_lcp, "ms"), delta=f"{st.session_state.percent_improvement:.1f}% lower")
-    else:
-        col2.metric("Scenario LCP estimate", "Not calculated")
-
-    if pred_value is None:
-        st.warning("The model could not create a baseline prediction for this audit, so the what-if planner is unavailable.")
-        return
-
-    with st.form("optimization_form"):
-        st.write("Choose target peer percentiles for the resource areas you might improve.")
-        reset_changes = st.form_submit_button("Reset Planner")
-        if reset_changes:
-            for metric in SCENARIO_METRICS:
-                original_percentile = percentile_for(lcp_reference_data, metric["key"], result.get(metric["key"]))
-                st.session_state[f"{device}_{metric['key']}"] = int(original_percentile or 50)
-            st.session_state.pop("estimated_new_lcp", None)
-            st.session_state.pop("percent_improvement", None)
-            st.rerun()
-
-        selected_percentiles = {}
-        original_percentiles = {}
-        col_a, col_b = st.columns(2)
-        for index, metric in enumerate(SCENARIO_METRICS):
-            key = metric["key"]
-            start_percentile = int(round(percentile_for(lcp_reference_data, key, result.get(key)) or 50))
-            original_percentiles[key] = start_percentile
-            column = col_a if index % 2 == 0 else col_b
-            with column:
-                selected_percentiles[key] = st.slider(
-                    metric["label"],
-                    min_value=0,
-                    max_value=100,
-                    value=start_percentile,
-                    key=f"{device}_{st.session_state.reference_key}_{key}",
-                    help="Lower targets represent lighter, faster peer behavior. Leaving the slider unchanged keeps the original audit value.",
-                )
-        submitted = st.form_submit_button("Estimate What-if Result")
-
-    if submitted:
-        modified_result = result.copy()
-        changed_metrics = 0
-        for metric, percentile in selected_percentiles.items():
-            if percentile == original_percentiles.get(metric):
-                continue
-            series = pd.to_numeric(lcp_reference_data[metric], errors="coerce").dropna()
-            if not series.empty:
-                modified_result[metric] = np.percentile(series, percentile)
-                changed_metrics += 1
-
-        if changed_metrics == 0:
-            st.session_state.percent_improvement = 0.0
-            st.session_state.estimated_new_lcp = result["largest-contentful-paint"]
-            st.rerun()
-
-        new_prediction = predict(modified_result, device)
-        if new_prediction is None:
-            st.warning("The model could not estimate that scenario because required audit fields were unavailable.")
-            return
-
-        new_pred_value = float(new_prediction[0])
-        if pred_value <= 0:
-            st.warning("The baseline prediction was not valid, so the scenario estimate could not be calculated.")
-            return
-
-        percent_improvement = ((pred_value - new_pred_value) / pred_value) * 100
-        estimated_new_lcp = result["largest-contentful-paint"] * (new_pred_value / pred_value)
-        st.session_state.percent_improvement = percent_improvement
-        st.session_state.estimated_new_lcp = estimated_new_lcp
-        st.rerun()
-
-
 def render_raw_audit(result):
     st.caption("Advanced view of the extracted PageSpeed Insights fields used by the dashboard.")
     rows = [{"Field": key, "Value": value} for key, value in sorted(result.items())]
@@ -1126,21 +987,3 @@ def load_component(metric_data, category=None, scope=None):
         render_benchmark(detail_rows, detail_reference_label)
         with st.expander("Advanced: raw audit data", expanded=False):
             render_raw_audit(result)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

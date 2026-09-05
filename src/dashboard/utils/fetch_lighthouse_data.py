@@ -31,7 +31,6 @@ def extract_resource_summary(result, audits):
     items = rs.get("items", [])
 
     for item in items:
-        # Lighthouse typically uses 'resourceType', 'transferSize', 'requestCount'
         rtype = item.get("resourceType")
         if not rtype:
             continue
@@ -79,7 +78,6 @@ def extract_opportunities(result, audits):
 
 def extract_insights(result, audits):
     """Read Lighthouse 13 evidence without treating time and byte savings alike."""
-    # Lighthouse's insight adapter exposes metricSavings and details.debugData:
     # https://github.com/GoogleChrome/lighthouse/blob/v13.0.0/core/audits/insights/insight-audit.js
     fields = {
         "render-blocking-insight": (
@@ -113,63 +111,53 @@ def extract_insights(result, audits):
 
 
 def extract_all_features(data):
-	result = {}
-	audits = data.get("audits", {}) or {}
-	field_data = data.get("field_data", {}) or {}
- 
-	core_keys = [
-		"largest-contentful-paint",
-		"cumulative-layout-shift",
-		"first-contentful-paint",
-		"total-blocking-time",
-		"speed-index",
-		"interactive",  # time to interactive
-	]
-	extra_simple = [
-		"total-byte-weight",
-		"dom-size-insight",
-		"unused-css-rules",
-		"unused-javascript",
-		"unminified-css",
-		"unminified-javascript",
-		"network-server-latency",
-	]
-	performance_score = data.get("performance_score")
-	result["performance_score"] = performance_score
-	result["field_data_scope"] = data.get("field_data_scope")
-	result = extract_field_values(result, field_data)
-	result = extract_simple_numeric_values(result, audits, core_keys)
-	result = extract_simple_numeric_values(result, audits, extra_simple)
-	result = extract_resource_summary(result, audits)
-	result = extract_mainthread_breakdown(result, audits)
-	result = extract_opportunities(result, audits)
-	result = extract_insights(result, audits)
+    audits = data.get("audits") or {}
+    result = {
+        "performance_score": data.get("performance_score"),
+        "field_data_scope": data.get("field_data_scope"),
+    }
+    numeric_keys = [
+        "largest-contentful-paint",
+        "cumulative-layout-shift",
+        "first-contentful-paint",
+        "total-blocking-time",
+        "speed-index",
+        "interactive",
+        "total-byte-weight",
+        "dom-size-insight",
+        "unused-css-rules",
+        "unused-javascript",
+        "unminified-css",
+        "unminified-javascript",
+        "network-server-latency",
+    ]
+    extract_field_values(result, data.get("field_data") or {})
+    extract_simple_numeric_values(result, audits, numeric_keys)
+    extract_resource_summary(result, audits)
+    extract_mainthread_breakdown(result, audits)
+    extract_opportunities(result, audits)
+    extract_insights(result, audits)
+    return result
 
-	return result
 
 def extract_useful_fields(data):
-	result = {}
-
-	audits = data.get("lighthouseResult", {}).get("audits", {})
-	result["audits"] = audits
-
-	categories = data.get("lighthouseResult", {}).get("categories", {})
-	performance = categories.get("performance", {})
-	result["performance_score"] = performance.get("score")
-
-	url_field_data = data.get("loadingExperience", {}) or {}
-	origin_field_data = data.get("originLoadingExperience", {}) or {}
-	if url_field_data.get("metrics"):
-		result["field_data"] = url_field_data
-		result["field_data_scope"] = "URL"
-	elif origin_field_data.get("metrics"):
-		result["field_data"] = origin_field_data
-		result["field_data_scope"] = "Origin"
-	else:
-		result["field_data"] = {}
-		result["field_data_scope"] = None
-
-	return result
+    lighthouse = data.get("lighthouseResult", {})
+    result = {
+        "audits": lighthouse.get("audits", {}),
+        "performance_score": lighthouse.get("categories", {}).get("performance", {}).get("score"),
+    }
+    url_field_data = data.get("loadingExperience") or {}
+    origin_field_data = data.get("originLoadingExperience") or {}
+    if url_field_data.get("metrics"):
+        result["field_data"] = url_field_data
+        result["field_data_scope"] = "URL"
+    elif origin_field_data.get("metrics"):
+        result["field_data"] = origin_field_data
+        result["field_data_scope"] = "Origin"
+    else:
+        result["field_data"] = {}
+        result["field_data_scope"] = None
+    return result
 
 def fetch_data(url, strategy, api_key=None):
     if api_key is None:

@@ -55,8 +55,6 @@ if submitted:
         st.error("Enter a website URL before running the audit.")
     else:
         st.session_state.website_submitted = False
-        st.session_state.pop("estimated_new_lcp", None)
-        st.session_state.pop("percent_improvement", None)
 
         with st.spinner("Running PageSpeed Insights audit..."):
             result = fetch_data(normalized_website, strategy.lower())
@@ -84,8 +82,3 @@ if st.session_state.website_submitted:
     load_component(metric_data=metric_data, category=None, scope="All sites")
 else:
     st.info("Run a PSI audit to view the dashboard.")
-
-
-
-
-

@@ -25,7 +25,7 @@ The app currently focuses on the metrics that users and site owners are most lik
 - Time to First Byte (TTFB)
 - Time to Interactive
 
-The main Overview page highlights LCP, CLS, and INP first because those are the Core Web Vitals. Supporting PageSpeed metrics are still available in the Metric Details tab, but they are treated as secondary signals.
+Overview separates lab LCP, CLS, and TBT from real-user LCP, CLS, and INP, then explains the results and presents platform-specific recommendations. Benchmarks and supporting metrics are available in Detailed results.
 
 ## Main Features
 
@@ -35,7 +35,6 @@ The main Overview page highlights LCP, CLS, and INP first because those are the 
 - Show Core Web Vitals as the main user-facing metrics.
 - Provide a "What to Fix First" section with links to web.dev guides.
 - Show detailed benchmark cards for each metric.
-- Include a what-if planner for estimating how LCP might change if resource metrics improved.
 - Keep raw audit data available for debugging or deeper review.
 
 ## Why I Built It This Way
@@ -68,9 +67,8 @@ src/
     utils/
       data_loader.py       Loads metric benchmark datasets
       fetch_lighthouse_data.py
-      predict.py
+      platform_guidance.py
     data/                  Benchmark CSV files
-    models/                Saved LCP model
 ```
 
 ## Run the App
@@ -79,7 +77,7 @@ This project is intended to run in a conda environment.
 
 ```bash
 conda env create -f environment.yml
-conda activate site-speed-insight
+conda activate site-speed-tracker
 streamlit run src/dashboard/app.py
 ```
 
@@ -87,7 +85,4 @@ If you already have a conda environment for the project, install the dependencie
 
 ## Notes
 
-The what-if planner is a model-based estimate. It should be used for planning and prioritization, not as a promise that a site will hit that exact LCP after changes.
-
 The dashboard still depends on PageSpeed Insights results, so live audits can vary between runs. That is normal for Lighthouse-style lab data.
-
