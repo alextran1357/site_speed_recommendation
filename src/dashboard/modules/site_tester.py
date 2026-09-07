@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
-from utils.platform_guidance import PLATFORM_HELP, PLATFORM_OPTIONS, guidance_for
+from utils.platform_guidance import PLATFORM_HELP, PLATFORM_OPTIONS, PLATFORM_SUPPORT, guidance_for
 
 
 PRIMARY_METRICS = [
@@ -221,27 +221,22 @@ def inject_dashboard_styles():
             .priority-eyebrow.status-poor {color: #f87171 !important;}
             .priority-title {font-size: 1.2rem; font-weight: 800; color: #f8fafc !important; margin: 4px 0 10px;}
             .priority-measurement {display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px 14px;}
-            .priority-value {font-size: 2.5rem; line-height: 1; font-weight: 850;}
+            .priority-value {font-size: 1rem; font-weight: 750;}
             .priority-value.status-good {color: #34d399 !important;}
             .priority-value.status-watch {color: #fbbf24 !important;}
             .priority-value.status-poor {color: #f87171 !important;}
             .priority-target {font-size: 0.9rem; color: #cbd5e1 !important;}
-            .priority-impact {font-size: 1rem; font-weight: 800; margin-top: 8px;}
-            .priority-impact.status-good {color: #34d399 !important;}
-            .priority-impact.status-watch {color: #fbbf24 !important;}
-            .priority-impact.status-poor {color: #f87171 !important;}
+            .priority-impact {font-size: 1rem; line-height: 1.5; color: #e2e8f0 !important; margin: 8px 0;}
             .priority-peer {font-size: 0.8rem; color: #94a3b8 !important; margin-top: 2px;}
             .priority-fix {background: #273449; border-left: 3px solid #60a5fa; border-radius: 5px; padding: 12px 14px; margin-top: 14px;}
             .priority-fix-label {font-size: 0.7rem; font-weight: 850; letter-spacing: 0.07em; text-transform: uppercase; color: #93c5fd !important;}
             .priority-fix-title {font-size: 1rem; font-weight: 800; color: #f8fafc !important; margin-top: 2px;}
             .priority-fix p {margin: 5px 0 0; color: #cbd5e1 !important; line-height: 1.45;}
             .priority-help {border-top: 1px solid #475569; margin-top: 12px; padding-top: 12px;}
-            .fix-evidence {font-size: 0.78rem; color: #94a3b8 !important; margin-top: 5px;}
-            .resource-links {display: flex; flex-wrap: wrap; align-items: flex-start; gap: 8px 10px;}
+            .fix-evidence {font-size: 0.85rem; line-height: 1.5; color: #cbd5e1 !important; margin-top: 14px;}
             .resource-link.priority-link {border-color: #60a5fa;}
             .priority-card.secondary-fix {padding: 18px 20px; border-color: #334155;}
             .secondary-fix .priority-title {font-size: 1.1rem;}
-            .secondary-fix .priority-value {font-size: 2rem;}
             .resource-link {display: inline-flex; align-items: center; box-sizing: border-box; max-width: 100%; min-height: 44px; padding: 9px 12px; border: 1px solid #64748b; border-radius: 6px; margin-top: 10px; color: #93c5fd !important; font-weight: 700; text-decoration: none; overflow-wrap: anywhere;}
             .resource-link:hover {background: #334155; text-decoration: underline;}
             .resource-link:focus-visible {outline: 2px solid #93c5fd; outline-offset: 3px;}
@@ -440,35 +435,42 @@ def issue_priority_score(issue):
     target = issue["good_threshold"]
     value = issue["raw_value"]
     distance = (value / target) if value is not None and target else 0
-    field_priority = 1 if issue["source"] == "Field" else 0
-    return severity, field_priority, distance
+    is_field = issue["source"] == "Field"
+    page_field = is_field and issue.get("field_data_scope") == "URL"
+    return page_field, severity, is_field, distance
 
 
-def build_priority_issues(metric_rows, field_rows):
+def build_priority_issues(metric_rows, field_rows, field_scope=None):
     lab_by_key = {row["key"]: row for row in metric_rows}
     field_by_key = {row["key"]: row for row in field_rows}
     issues = []
 
     for issue_id, field_key, lab_key in PRIORITY_ISSUES:
-        field_row = field_by_key.get(field_key)
-        lab_row = lab_by_key.get(lab_key)
-        if field_row and field_row["Status"] in {"Poor", "Needs improvement"}:
-            measured_row = field_row
-            source = "Field"
-        elif lab_row and lab_row["Status"] in {"Poor", "Needs improvement"}:
-            measured_row = lab_row
-            source = "Lab"
-        else:
-            continue
+        candidates = []
+        for source, row in (("Field", field_by_key.get(field_key)), ("Lab", lab_by_key.get(lab_key))):
+            if row and row["Status"] in {"Poor", "Needs improvement"}:
+                candidates.append({
+                    **row,
+                    "issue_id": issue_id,
+                    "source": source,
+                    "field_data_scope": field_scope,
+                    "lab_row": lab_by_key.get(lab_key),
+                })
+        if candidates:
+            issues.append(max(candidates, key=issue_priority_score))
 
-        issue = dict(measured_row)
-        issue["issue_id"] = issue_id
-        issue["source"] = source
-        issue["lab_row"] = lab_row
-        issues.append(issue)
+    return sorted(issues, key=issue_priority_score, reverse=True)
 
-    issues.sort(key=issue_priority_score, reverse=True)
-    return issues
+
+def priority_reason_for(issue):
+    if issue["source"] == "Field" and issue.get("field_data_scope") == "URL":
+        return "First because this page has an above-target real-user measurement; page-level visitor problems take priority."
+    reason = "First by severity, using real-user evidence to break ties, then distance above target."
+    if issue["source"] == "Lab":
+        return reason + " This is a lab finding to investigate."
+    if issue.get("field_data_scope") == "Origin":
+        return reason + " This website-wide finding needs checking on this page."
+    return reason + " The real-user data's page or website scope is unavailable."
 
 
 def strongest_positive_value(result, keys):
@@ -487,7 +489,7 @@ def fix_for_issue(issue, result):
         if render_savings and render_savings > 0:
             return {
                 "fix_id": "render_blocking",
-                "title": "Remove render-blocking resources",
+                "title": "Check what delays the page appearing",
                 "evidence": f"PSI estimates up to {format_value(render_savings, 'ms')} of potential savings.",
                 "url": "https://developer.chrome.com/docs/performance/insights/render-blocking",
                 "label": "technical render-blocking guide",
@@ -503,7 +505,7 @@ def fix_for_issue(issue, result):
         if image_savings:
             return {
                 "fix_id": "images",
-                "title": "Optimize image delivery",
+                "title": "Make large images lighter to download",
                 "evidence": f"PSI estimates up to {format_value(image_savings, 'bytes')} of potential transfer savings.",
                 "url": "https://web.dev/learn/performance/image-performance",
                 "label": "technical image guide",
@@ -516,7 +518,7 @@ def fix_for_issue(issue, result):
         if server_latency and server_latency > 800:
             return {
                 "fix_id": "server",
-                "title": "Improve the initial server response",
+                "title": "Ask about the slow first response",
                 "evidence": f"PSI measured {format_value(server_latency, 'ms')} of server latency.",
                 "url": "https://web.dev/articles/optimize-ttfb",
                 "label": "server response guide",
@@ -524,8 +526,8 @@ def fix_for_issue(issue, result):
 
         return {
             "fix_id": "lcp",
-            "title": "Inspect and optimize the LCP element",
-            "evidence": "Recommended from the failing LCP measurement; no larger PSI savings estimate was available.",
+            "title": "Check the main image or heading",
+            "evidence": "The main content took longer than the target to appear. This measurement does not identify the cause; start with the check above.",
             "url": "https://web.dev/articles/optimize-lcp",
             "label": "LCP optimization guide",
         }
@@ -533,8 +535,8 @@ def fix_for_issue(issue, result):
     if issue_id == "cls":
         return {
             "fix_id": "cls",
-            "title": "Reserve space for elements that shift",
-            "evidence": "Recommended from the failing CLS measurement.",
+            "title": "Find what makes the content move",
+            "evidence": "The layout movement was above target. This measurement does not identify which element moved.",
             "url": "https://web.dev/articles/optimize-cls",
             "label": "CLS optimization guide",
         }
@@ -543,13 +545,13 @@ def fix_for_issue(issue, result):
     unused_javascript_ms = clean_number(result.get("unused-javascript_savings_ms"))
     if unused_javascript_bytes or unused_javascript_ms:
         evidence = (
-            f"PSI estimates about {format_value(unused_javascript_bytes, 'bytes')} of removable code."
+            f"The lab test found about {format_value(unused_javascript_bytes, 'bytes')} of code unused during this test. It may still be needed for other actions."
             if unused_javascript_bytes
             else f"PSI estimates up to {format_value(unused_javascript_ms, 'ms')} of potential savings."
         )
         return {
             "fix_id": "javascript",
-            "title": "Reduce unused JavaScript",
+            "title": "Review tools that add extra code",
             "evidence": evidence,
             "url": "https://developer.chrome.com/docs/lighthouse/performance/unused-javascript",
             "label": "unused JavaScript guidance",
@@ -559,7 +561,7 @@ def fix_for_issue(issue, result):
     if script_time and script_time > 200:
         return {
             "fix_id": "javascript",
-            "title": "Break up JavaScript execution",
+            "title": "Reduce work from apps and effects",
             "evidence": f"PSI measured {format_value(script_time, 'ms')} of script evaluation work.",
             "url": "https://web.dev/articles/optimize-long-tasks",
             "label": "long-task optimization guide",
@@ -567,25 +569,20 @@ def fix_for_issue(issue, result):
 
     return {
         "fix_id": "javascript",
-        "title": "Investigate long main-thread tasks",
-        "evidence": "Recommended from the failing INP or TBT measurement.",
+        "title": "Check apps, popups, and interactive tools",
+        "evidence": "The response or blocking measurement was above target. This measurement alone does not identify the responsible tool.",
         "url": "https://web.dev/articles/optimize-inp",
         "label": "INP optimization guide",
     }
 
 
-def resource_links_for(fix, guidance):
-    links = []
-    if guidance["resource_url"]:
-        links.append(
-            f'<a class="resource-link priority-link" href="{html.escape(guidance["resource_url"], quote=True)}" '
-            f'target="_blank" rel="noopener">Follow these steps: {html.escape(guidance["resource_label"])}</a>'
-        )
-    links.append(
-        f'<a class="resource-link" href="{html.escape(fix["url"], quote=True)}" '
-        f'target="_blank" rel="noopener">For your developer: {html.escape(fix["label"])}</a>'
+def owner_guide_for(guidance):
+    if not guidance["resource_url"]:
+        return ""
+    return (
+        f'<a class="resource-link priority-link" href="{html.escape(guidance["resource_url"], quote=True)}" '
+        f'target="_blank" rel="noopener">Follow these steps: {html.escape(guidance["resource_label"])}</a>'
     )
-    return f'<div class="resource-links">{"".join(links)}</div>'
 
 
 def render_platform_selector(result):
@@ -626,9 +623,31 @@ def render_platform_selector(result):
 
 
 def issue_title_for(issue):
-    if issue["issue_id"] == "responsiveness" and issue["source"] == "Lab":
-        return "Responsiveness risk (TBT)"
-    return metric_title(issue)
+    if issue["issue_id"] == "lcp":
+        return "Main content takes too long to appear"
+    if issue["issue_id"] == "cls":
+        return "Content moves while the page loads"
+    if issue["source"] == "Lab":
+        return "The page may be slow to respond"
+    return "Clicks and taps take too long to respond"
+
+
+def visitor_impact_for(issue):
+    impacts = {
+        "lcp": "Visitors may wait longer to see the main image or text.",
+        "cls": "Moving content can interrupt reading or make visitors tap the wrong link.",
+        "responsiveness": "Visitors may notice a delay after clicking a button or tapping a menu.",
+    }
+    impact = impacts[issue["issue_id"]]
+    if issue["source"] == "Lab":
+        if issue["issue_id"] == "responsiveness":
+            return "The test found work that could delay clicks and taps while loading. This is a warning sign, not a measurement of actual visitor response times."
+        return impact + " This was found in a simulated test."
+    if issue.get("field_data_scope") == "Origin":
+        return impact + " The data covers this website overall; check whether this happens on this page."
+    if issue.get("field_data_scope") != "URL":
+        return impact + " We cannot tell whether the visitor data covers this page or the whole website."
+    return impact
 
 
 def lab_benchmark_context_for(issue):
@@ -654,21 +673,6 @@ def concise_target_for(row):
     return f"Target {comparison} {format_value(row['good_threshold'], row['unit'])}"
 
 
-def impact_text_for(row):
-    value = row["raw_value"]
-    target = row["good_threshold"]
-    if value is None or not target:
-        return row["Status"]
-    if row["lower_is_better"] and value > target:
-        qualifier = "slower" if row["unit"] == "ms" else "above"
-        return f"{value / target:.1f}× {qualifier} than the healthy target"
-    if not row["lower_is_better"] and value < target:
-        if row["unit"] == "score_percent":
-            return f"{(target - value) * 100:.0f} points below the healthy target"
-        return "Below the healthy target"
-    return "Within the healthy target"
-
-
 def render_data_source_header(title, context):
     st.markdown(
         f"""
@@ -681,57 +685,62 @@ def render_data_source_header(title, context):
     )
 
 
-def results_interpretation(lab_rows, field_rows):
+def results_interpretation(lab_rows, field_rows, field_scope=None):
+    areas = {"LCP": "loading speed", "CLS": "layout stability", "INP": "responsiveness", "TBT": "main-thread blocking"}
     lab_available = [row for row in lab_rows if row["Status"] != "Unavailable"]
     field_available = [row for row in field_rows if row["Status"] != "Unavailable"]
     issue_statuses = {"Poor", "Needs improvement"}
-    lab_has_issues = any(row["Status"] in issue_statuses for row in lab_available)
-    field_has_issues = any(row["Status"] in issue_statuses for row in field_available)
+    lab_issues = [row for row in lab_available if row["Status"] in issue_statuses]
+    field_issues = [row for row in field_available if row["Status"] in issue_statuses]
+    field_missing = [areas[key] for key in ("LCP", "CLS", "INP") if key not in {row["short"] for row in field_available}]
+    lab_missing = [areas[key] for key in ("LCP", "CLS", "TBT") if key not in {row["short"] for row in lab_available}]
+
+    if not lab_available and not field_available:
+        return {
+            "tone": "caution",
+            "title": "Performance measurements are unavailable",
+            "body": "There is not enough data to assess this page or recommend a first fix. Try another audit.",
+        }
 
     if not field_available:
         tone = "caution"
         title = "Only the lab test is available"
-        condition = "found performance problems" if lab_has_issues else "looks healthy"
-        body = (
-            f"This simulated test {condition}; treat it as a diagnostic snapshot because "
-            "there is not enough real-user data to confirm what visitors usually experience."
-        )
-    elif not lab_available:
-        tone = "poor" if field_has_issues else "good"
-        title = "Use the available real-user results"
-        condition = "include performance problems" if field_has_issues else "look healthy"
-        body = (
-            f"The available 28-day real-user metrics {condition}; run another lab audit "
-            "if you need diagnostic clues for a specific page load."
-        )
-    elif lab_has_issues and not field_has_issues:
-        tone = "mixed"
-        title = "Real users look better than this lab test"
-        body = (
-            "Trust the 28-day field data for typical visitor experience; use this Lighthouse result "
-            "as a diagnostic clue for possible improvements."
-        )
-    elif field_has_issues and not lab_has_issues:
-        tone = "poor"
-        title = "Real users are seeing problems the lab test missed"
-        body = (
-            "Prioritize the 28-day field results because one simulated run may not reproduce real devices, "
-            "networks, or interactions."
-        )
-    elif lab_has_issues:
-        tone = "poor"
-        title = "Both lab and real-user data show problems"
-        body = "Start with the recommendations below, which prioritize the strongest measured issues."
+        condition = "found performance problems" if lab_issues else "looks healthy in the available measurements"
+        body = f"This simulated test {condition}; there is not enough real-user data to confirm visitor experience."
     else:
-        tone = "good"
-        title = "Available lab and real-user results look healthy"
-        body = "No immediate performance issue stands out; test again after major site changes."
+        scope = {"URL": "for this page", "Origin": "across this website"}.get(field_scope, "with unknown page or website scope")
+        if field_issues:
+            tone = "poor"
+            title = {
+                "URL": "Real-user problems on this page",
+                "Origin": "Website-wide real-user problems",
+            }.get(field_scope, "Real-user problems; scope unavailable")
+            problem_areas = ", ".join(areas[row["short"]] for row in field_issues)
+            body = f"Above-target real-user measurements {scope}: {problem_areas}."
+            if field_scope == "URL":
+                body += " Start with these page-level visitor problems."
+            else:
+                body += " These website or unscoped findings are ranked alongside lab findings by severity; confirm them on this page."
+        else:
+            tone = "caution" if field_missing or field_scope != "URL" else ("mixed" if lab_issues else "good")
+            title = "Real-user data is incomplete" if field_missing else f"Real-user metrics {scope} look healthy"
+            healthy_areas = ", ".join(areas[row["short"]] for row in field_available)
+            body = f"Available real-user measurements {scope} are within target: {healthy_areas}."
+            if field_scope != "URL":
+                body += " This does not confirm that this specific page is healthy."
 
+        if field_missing:
+            body += f" Real-user data unavailable: {', '.join(field_missing)}."
+        if lab_issues:
+            body += " Use the lab findings below to investigate this page's performance."
+
+    if lab_missing:
+        body += f" Lab data unavailable: {', '.join(lab_missing)}."
     return {"tone": tone, "title": title, "body": body}
 
 
-def render_results_interpretation(lab_rows, field_rows):
-    interpretation = results_interpretation(lab_rows, field_rows)
+def render_results_interpretation(lab_rows, field_rows, field_scope=None):
+    interpretation = results_interpretation(lab_rows, field_rows, field_scope)
     st.html(
         f"""
         <section class="meaning-card {interpretation['tone']}" aria-labelledby="results-meaning-title">
@@ -820,15 +829,22 @@ def render_benchmark_controls(metric_data, device):
 def render_recommendation_card(issue, result, platform, rank):
     fix = fix_for_issue(issue, result)
     guidance = guidance_for(platform, fix["fix_id"])
-    resource_links = resource_links_for(fix, guidance)
+    owner_guide = owner_guide_for(guidance)
     is_primary = rank == 1
     css_class = "priority-card" if is_primary else "priority-card secondary-fix"
+    source = "Lighthouse lab test"
+    if issue["source"] == "Field":
+        source = {
+            "URL": "Real-user data for this page",
+            "Origin": "Website-wide real-user data",
+        }.get(issue.get("field_data_scope"), "Real-user data · Scope unavailable")
     if is_primary:
-        source = "Real-user field data" if issue["source"] == "Field" else "Current Lighthouse lab test"
         eyebrow = f"Highest priority · {source}"
-        peer_context = f'<div class="priority-peer">{html.escape(lab_benchmark_context_for(issue))}</div>'
+        peer_context = (
+            f'<div class="priority-peer">{html.escape(priority_reason_for(issue))}</div>'
+            f'<div class="priority-peer">{html.escape(lab_benchmark_context_for(issue))}</div>'
+        )
     else:
-        source = "Field data" if issue["source"] == "Field" else "Lab test"
         eyebrow = f"Priority {rank} · {source} · {issue['Status']}"
         peer_context = ""
 
@@ -838,30 +854,35 @@ def render_recommendation_card(issue, result, platform, rank):
         <article class="{css_class}" aria-label="Recommendation {rank}">
             <div class="priority-eyebrow {issue['status_class']}">{html.escape(eyebrow)}</div>
             <h4 class="priority-title">{html.escape(issue_title_for(issue))}</h4>
-            <div class="priority-measurement">
-                <span class="priority-value {issue['status_class']}">{html.escape(issue['Current value'])}</span>
-                <span class="priority-target">{html.escape(concise_target_for(issue))}</span>
-            </div>
-            <div class="priority-impact {issue['status_class']}">{html.escape(impact_text_for(issue))}</div>
-            {peer_context}
+            <p class="priority-impact">{html.escape(visitor_impact_for(issue))}</p>
             <div class="priority-fix">
-                <div class="priority-fix-label">What you can try</div>
+                <div class="priority-fix-label">Start with this</div>
                 <div class="priority-fix-title">{html.escape(fix['title'])}</div>
                 <p>{html.escape(guidance['owner_action'])}</p>
+                {owner_guide}
                 <div class="priority-help">
-                    <div class="priority-fix-label">When to get help</div>
+                    <div class="priority-fix-label">Prefer someone to fix it?</div>
                     <p>{html.escape(guidance['help_action'])}</p>
                 </div>
-                <div class="fix-evidence"><strong>Why this was suggested:</strong> {html.escape(fix['evidence'])}</div>
             </div>
-            {resource_links}
+            <div class="fix-evidence">
+                <strong>Supporting evidence</strong>
+                <div class="priority-measurement">
+                    <span>{html.escape(metric_title(issue))}:</span>
+                    <span class="priority-value {issue['status_class']}">{html.escape(issue['Current value'])} · {html.escape(issue['Status'])}</span>
+                    <span class="priority-target">{html.escape(concise_target_for(issue))}</span>
+                </div>
+                <p>{html.escape(fix['evidence'])}</p>
+                {peer_context}
+                <a class="resource-link" href="{html.escape(fix['url'], quote=True)}" target="_blank" rel="noopener">For your developer: {html.escape(fix['label'])}</a>
+            </div>
         </article>
         """
     )
 
 
 def render_action_plan(result, metric_rows, field_rows, platform, limit=3):
-    issues = build_priority_issues(metric_rows, field_rows)[:limit]
+    issues = build_priority_issues(metric_rows, field_rows, result.get("field_data_scope"))[:limit]
     if not issues:
         st.info(
             "No above-target priority issues were found in the available measurements. "
@@ -869,10 +890,38 @@ def render_action_plan(result, metric_rows, field_rows, platform, limit=3):
         )
         return
 
+    st.caption(
+        "Start with one change. Save a backup or work on a draft before editing. "
+        "If you are unsure how to undo a change, use the help route on the card."
+    )
     for rank, issue in enumerate(issues, start=1):
         if rank == 2:
             st.markdown("#### Next priorities")
         render_recommendation_card(issue, result, platform, rank)
+
+    st.markdown("#### Get help with these fixes")
+    st.write(
+        "Contact the person named on the card through your hosting account, app or theme support page, "
+        "or the agency that built your site. Send the page address, the selected mobile or desktop test, "
+        "and the recommendation with its supporting evidence. Ask them to investigate the suggested cause "
+        "and check the result after fixing it."
+    )
+    support = PLATFORM_SUPPORT.get(platform)
+    if support:
+        st.html(
+            f'<a class="resource-link" href="{html.escape(support["url"], quote=True)}" '
+            f'target="_blank" rel="noopener">{html.escape(support["label"])}</a>'
+        )
+        st.caption(support["context"])
+    else:
+        st.caption("Not sure who runs your site? Check your website bill or editor login for the provider's name and support contact.")
+    st.markdown("#### Check that the change helped")
+    st.write(
+        "Preview the page and check its menus, forms, and checkout if it has one. When the change is ready, publish it and run this audit again "
+        "for the same page and device. Compare the lab measurement linked to the problem over a few runs, "
+        "since single tests vary. If something stops working, undo the change. "
+        "Real-user results cover the previous 28 days, so they will not update immediately."
+    )
 
 
 def render_overview(result, strategy, reference_label, metric_rows):
@@ -895,9 +944,11 @@ def render_overview(result, strategy, reference_label, metric_rows):
 
     st.markdown('<div class="metric-section-divider"></div>', unsafe_allow_html=True)
     if field_scope == "URL":
-        field_context = "Real-user experience · Previous 28 days · All devices"
+        field_context = "Real-user experience · This page · Previous 28 days · All devices"
     elif field_scope == "Origin":
-        field_context = "Real-user experience · Origin-level fallback · Previous 28 days · All devices"
+        field_context = "Real-user experience · Website-wide (origin fallback) · Previous 28 days · All devices"
+    elif any(row["Status"] != "Unavailable" for row in field_rows):
+        field_context = "Real-user experience · Scope unavailable · Previous 28 days · All devices"
     else:
         field_context = "Real-user experience · CrUX unavailable for this URL and origin"
     render_data_source_header("Field data", field_context)
@@ -906,7 +957,7 @@ def render_overview(result, strategy, reference_label, metric_rows):
         with col:
             render_metric_tile(row)
 
-    render_results_interpretation(lab_rows, field_rows)
+    render_results_interpretation(lab_rows, field_rows, field_scope)
     st.html('<h2 class="recommendations-heading">What to Fix First</h2>')
     platform = render_platform_selector(result)
     render_action_plan(result, metric_rows, field_rows, platform, limit=3)

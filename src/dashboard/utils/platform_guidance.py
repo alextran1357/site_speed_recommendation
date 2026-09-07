@@ -65,109 +65,133 @@ PLATFORM_FIX_HELP = {
 }
 
 
+PLATFORM_SUPPORT = {
+    "WordPress": {
+        "url": "https://wordpress.org/support/forums/",
+        "label": "Ask the WordPress community",
+        "context": "Community advice, not a repair service. For hosting problems, contact your own host; for a paid theme or plugin, use its provider's support.",
+    },
+    "Shopify": {
+        "url": "https://help.shopify.com/en/manual/your-account/contact-shopify-support",
+        "label": "Contact Shopify Support",
+        "context": "Start here if you need help finding the right contact. App or custom theme changes may need their provider or your site designer.",
+    },
+    "Wix": {
+        "url": "https://support.wix.com/en/article/contacting-wix-customer-care-for-support",
+        "label": "Contact Wix Support",
+        "context": "Start here for Wix features. An outside app or custom code may need its provider or your site designer.",
+    },
+    "Squarespace": {
+        "url": "https://support.squarespace.com/hc/en-us/requests/new",
+        "label": "Contact Squarespace Support",
+        "context": "Start here for Squarespace features. Custom code or outside tools may need their provider or your site designer.",
+    },
+}
+
+
 PLATFORM_ACTIONS = {
     "WordPress": {
         "render_blocking": (
-            "Review recently added plugins and visual effects. Remove anything you no longer use, then test the page again.",
-            "Ask your theme or plugin developer which stylesheet or script is delaying the first visible content.",
+            "In Plugins, check for a recently added visual effect or popup. On a test copy of your site, turn off one nonessential plugin and compare the page.",
+            "Ask your WordPress site designer or the plugin's support team to check what is delaying the first visible content.",
         ),
         "images": (
-            "Resize and compress the large image near the top of the page, then replace it in the Media Library or page editor.",
-            "Ask your theme developer to confirm that the page is not loading the full-size image when a smaller version would work.",
+            "Save a copy of the large image near the top of the page. Follow the image guide to reduce its file size, then replace it in the page editor and check that it still looks clear.",
+            "Ask your WordPress site designer to check the size of the image visitors actually download and replace it with a suitable smaller version.",
         ),
         "server": (
-            "Ask your host whether page caching is enabled, and remove plugins you no longer need.",
-            "Send the server-response result to your hosting provider first; they can check caching and server limits.",
+            "Open your hosting account's support chat or ticket form. Ask whether it can investigate the slow first response and check page caching, which saves a ready-made version of a page.",
+            "Your hosting provider is the first contact. If it finds a theme or plugin problem, ask your WordPress site designer to follow up.",
         ),
         "lcp": (
-            "Check the main image, banner, or heading visible when the page opens. Simplify it and compress any large image there.",
-            "Ask your theme developer to identify the LCP element and why it is loading late.",
+            "Open the page and look at the main image or banner visitors see first. In a draft, try one still image instead of a slideshow or video, then compare the page.",
+            "Ask your WordPress site designer to identify which main image or text appears late and what is delaying it.",
         ),
         "cls": (
-            "Check banners, popups, ads, embeds, and images that appear late. Disable the responsible plugin temporarily and test again.",
-            "Ask the plugin or theme developer to reserve space for the element before it loads.",
+            "Reload the page and watch for a banner, image, or popup that pushes other content around. Note what moves and when; you do not need to edit code to do this check.",
+            "Send those observations to your WordPress site designer or the responsible plugin's support team. Ask them to keep space available before that item appears.",
         ),
         "javascript": (
-            "Remove unused plugins and temporarily disable nonessential popups, chat, analytics, or animation tools to find the slowdown.",
-            "Ask the responsible plugin or theme developer to load its scripts later or reduce the work they perform.",
+            "In Plugins, look for a popup, chat tool, or animation you do not need. On a test copy, turn off one at a time and check whether the page responds better.",
+            "Ask the plugin's support team or your WordPress site designer to reduce the work that tool makes the browser do. Unused code in one test is not proof that a plugin can be deleted.",
         ),
     },
     "Shopify": {
         "render_blocking": (
-            "Review recently added apps, app embeds, animations, and busy theme sections. Disable one at a time and retest.",
-            "Ask the app provider or theme developer which script or style is delaying the first visible content.",
+            "In a copy of your theme, check recently added app embeds (features an app adds to the page). Turn off one nonessential popup or visual effect and preview the page.",
+            "Ask the app provider or your Shopify theme designer to check which app or theme files delay the first visible content.",
         ),
         "images": (
-            "Replace oversized hero or product images and reduce large slideshows. Shopify already handles image delivery and compression.",
-            "Ask your theme developer to verify that the hero image is requested at the right size and priority.",
+            "In a copy of your theme, try one still image instead of a large slideshow or video at the top of the page. Check that product images still look clear.",
+            "Ask your Shopify theme designer to check whether visitors download a larger image than the page needs.",
         ),
         "server": (
-            "Do not add another CDN or compression service. Shopify manages those; instead, review apps, theme sections, and redirects.",
-            "Contact Shopify Support if the response remains slow after testing your theme and apps.",
+            "Shopify manages your hosting. Repeat the test for the same page; if the first response remains slow, open Shopify Support using the link below.",
+            "Ask Shopify Support to investigate the slow first response and advise whether your theme designer or an app provider needs to help.",
         ),
         "lcp": (
-            "Check the hero image or main banner, reduce slideshow content, and compare performance with nonessential app embeds disabled.",
-            "Ask your theme developer to identify the LCP element and make it load earlier.",
+            "In a copy of your theme, open the top banner section. Try one still image instead of a slideshow or video and preview the result. The section guide below shows where to edit.",
+            "Ask your Shopify theme designer to identify which main image or text appears late and help it appear sooner.",
         ),
         "cls": (
-            "Check announcement bars, popups, app widgets, and image sections that move after the page appears. Disable one at a time and retest.",
-            "Ask the app provider or theme developer to reserve space for the moving element.",
+            "Reload the page and watch for an announcement bar, popup, or app feature that pushes content around. Note the moving item and when it appears.",
+            "Ask the app provider or your Shopify theme designer to keep space available for that item before it appears.",
         ),
         "javascript": (
-            "Remove apps you no longer use and disable nonessential app embeds, tracking tools, animations, and popups before retesting.",
-            "Ask the app provider or theme developer to reduce or delay the script work identified by the audit.",
+            "In a copy of your theme, open App embeds in the theme editor. Turn off one nonessential popup, chat tool, or animation and preview the result using the guide below.",
+            "Ask the app provider or your Shopify theme designer to reduce the work that tool makes the browser do. Do not uninstall an app just because some code was unused in this test.",
         ),
     },
     "Wix": {
         "render_blocking": (
-            "Reduce animations, third-party apps, and custom code near the top of the page, then retest.",
-            "Contact Wix Support or the app provider if a Wix feature or third-party app is delaying the page.",
+            "In the Wix editor, try turning off one animation or nonessential app near the top of the page. Preview the page before publishing.",
+            "Ask Wix Support about Wix features, or the app provider about an outside app, that may be delaying the first visible content.",
         ),
         "images": (
-            "Use the Wix editor to replace oversized images and reduce large galleries, videos, or background media near the top of the page.",
-            "Contact Wix Support if an optimized image is still being delivered much larger than it appears.",
+            "In the Wix editor, try a smaller image or one still image instead of a large gallery or video near the top of the page. Follow the media guide and preview the result.",
+            "Ask Wix Support or your site designer to check whether visitors download an image larger than the page needs.",
         ),
         "server": (
-            "Wix manages hosting and delivery. Check Wix status, then simplify heavy page content and third-party tools before retesting.",
-            "Contact Wix Support if the server response stays slow across several tests.",
+            "Wix manages your hosting. Repeat the test for the same page; if the first response remains slow, open Wix Support using the link below.",
+            "Ask Wix Support to investigate the slow first response before changing your page content.",
         ),
         "lcp": (
-            "Simplify the first screen of the page: reduce large media, animations, galleries, and third-party widgets there.",
-            "Ask Wix Support or your site designer to identify why the main visible element is loading late.",
+            "In the Wix editor, check the first screen visitors see. Try one still image instead of a video or gallery, or turn off an entrance animation, then preview the result.",
+            "Ask Wix Support or your site designer to identify why the main image or text appears late.",
         ),
         "cls": (
-            "Check animations, galleries, embeds, banners, and apps that appear or move after the page begins loading.",
-            "Ask Wix Support or the app provider about the element that the audit reports as moving.",
+            "Reload the page and watch for a banner, gallery, or app feature that pushes content around. Note what moves and when it appears.",
+            "Ask Wix Support, your site designer, or the app provider to keep space available for the moving item before it appears.",
         ),
         "javascript": (
-            "Remove unused apps and third-party code, and reduce nonessential animations or widgets. Retest after each change.",
-            "Contact the app provider or Wix Support if built-in or third-party scripts remain the main cause.",
+            "In the Wix editor, try turning off one nonessential animation or app feature. Use the guide below to review extra tools, and preview the page before publishing.",
+            "Ask Wix Support about built-in features or the app provider about outside tools. Ask them to reduce the work that makes the page slow to respond.",
         ),
     },
     "Squarespace": {
         "render_blocking": (
-            "Temporarily remove custom code, third-party scripts, heavy embeds, and animations, then retest to find the cause.",
-            "Ask the script provider or a Squarespace Expert to reduce or delay the resource causing the slowdown.",
+            "In the page editor, try turning off one animation or hiding a nonessential embedded tool, such as a video player or social feed. Preview the result before publishing.",
+            "Ask your Squarespace site designer or the tool's provider to check what delays the first visible content. Leave custom code changes to them if you are unfamiliar with it.",
         ),
         "images": (
-            "Replace oversized images, keep individual images below 500 KB when practical, and reduce large galleries or videos.",
-            "Ask a Squarespace Expert to check why the main image is loading late or at the wrong size.",
+            "Save a copy of the large image near the top of the page. Follow the image guide to reduce its file size, then replace it in the page editor and check that it still looks clear.",
+            "Ask your Squarespace site designer to check why the main image downloads slowly or at a larger size than needed.",
         ),
         "server": (
-            "Squarespace manages hosting and image delivery. Check Squarespace status, then reduce heavy page content and redirects.",
-            "Contact Squarespace Support if slow server responses continue across several tests.",
+            "Squarespace manages your hosting. Repeat the test for the same page; if the first response remains slow, open Squarespace Support using the link below.",
+            "Ask Squarespace Support to investigate the slow first response before changing your page content.",
         ),
         "lcp": (
-            "Simplify the first screen of the page by reducing large images, video, animations, and embedded content.",
-            "Ask a Squarespace Expert to identify the LCP element and any custom code delaying it.",
+            "In the page editor, check the first screen visitors see. Try one still image instead of a video or gallery, then preview the result. The page-size guide below can help.",
+            "Ask your Squarespace site designer to identify which main image or text appears late and what is delaying it.",
         ),
         "cls": (
-            "Check announcement bars, popups, embeds, animations, and custom code that make content move after it appears.",
-            "Ask the embed provider or a Squarespace Expert to reserve space for the moving element.",
+            "Reload the page and watch for a banner, popup, or embedded tool that pushes content around. Note what moves and when it appears.",
+            "Ask your Squarespace site designer or the tool's provider to keep space available for the moving item before it appears.",
         ),
         "javascript": (
-            "Remove unused custom code and third-party embeds, then retest after disabling each external tool.",
-            "Ask the script provider or a Squarespace Expert to reduce or delay the JavaScript work.",
+            "In the page editor, try hiding one nonessential tool, such as a social feed or chat box, and preview the result. Ask your site designer to handle any custom code.",
+            "Ask your Squarespace site designer or the tool's provider to reduce the work that makes the page slow to respond.",
         ),
     },
 }
@@ -175,28 +199,28 @@ PLATFORM_ACTIONS = {
 
 GENERIC_ACTIONS = {
     "render_blocking": (
-        "Review recently added tools, tracking, animations, and visual effects. Disable nonessential items one at a time and retest.",
-        "Ask your website provider or developer which script or stylesheet is delaying the first visible content.",
+        "In your site editor, look for a recently added popup, animation, or other optional tool. In a draft, turn off one item and preview whether the page appears sooner.",
+        "Ask your site designer or website provider to find which files delay the first visible content and help them load sooner.",
     ),
     "images": (
-        "Resize and compress the largest image near the top of the page, replace it in your site editor, and retest.",
-        "Ask whoever maintains the site to verify that the main image loads at the right size and priority.",
+        "Save a copy of the large image near the top of the page. Reduce its file size, replace it in your site editor, and check that it still looks clear. If you are unsure how, ask the person below.",
+        "Ask your site designer or website provider to check the size visitors actually download and supply a suitable smaller image.",
     ),
     "server": (
-        "Ask your website host whether caching is enabled and whether it can investigate the slow response.",
-        "Send this result to your hosting provider or developer so they can check the server and redirects.",
+        "Open your website host's support chat or ticket form and ask it to investigate the slow first response. You can find the host's name on your website bill or account.",
+        "Your hosting provider is the first contact. Ask it to check the server response and involve your site developer if it finds a code problem.",
     ),
     "lcp": (
-        "Check the main image, banner, or heading visible when the page opens and simplify any heavy content there.",
-        "Ask your developer to identify the LCP element and why it is loading late.",
+        "In your site editor, check the main image or banner visitors see first. In a draft, try one still image instead of a slideshow or video, then preview the result.",
+        "Ask your site designer or website provider to identify which main image or text appears late and what is delaying it.",
     ),
     "cls": (
-        "Look for banners, images, ads, or embeds that move after appearing. Temporarily remove likely items and retest.",
-        "Ask your developer to reserve space for the element before it loads.",
+        "Reload the page and watch for a banner, image, or popup that pushes other content around. Note what moves and when; this check does not require code changes.",
+        "Send your observations to your site designer or website provider. Ask them to keep space available for the moving item before it appears.",
     ),
     "javascript": (
-        "Remove unused add-ons and disable nonessential chat, tracking, popups, or animations one at a time before retesting.",
-        "Ask your developer or add-on provider to reduce or delay the script work identified by the audit.",
+        "In your site editor, look for a nonessential popup, chat tool, or animation. In a draft, turn off one item and preview whether the page responds better.",
+        "Ask your site designer or the tool's provider to reduce the work that makes the page slow to respond. Do not delete code just because it was unused in one test.",
     ),
 }
 
