@@ -104,7 +104,7 @@ PLATFORM_ACTIONS = {
             "Your hosting provider is the first contact. If it finds a theme or plugin problem, ask your WordPress site designer to follow up.",
         ),
         "lcp": (
-            "Open the page and look at the main image or banner visitors see first. In a draft, try one still image instead of a slideshow or video, then compare the page.",
+            "Reload the page and watch for the identified content appearing late. If no item was identified, run another audit or send the help request before changing images or page content.",
             "Ask your WordPress site designer to identify which main image or text appears late and what is delaying it.",
         ),
         "cls": (
@@ -130,7 +130,7 @@ PLATFORM_ACTIONS = {
             "Ask Shopify Support to investigate the slow first response and advise whether your theme designer or an app provider needs to help.",
         ),
         "lcp": (
-            "In a copy of your theme, open the top banner section. Try one still image instead of a slideshow or video and preview the result. The section guide below shows where to edit.",
+            "Reload the page and watch for the identified content appearing late. If no item was identified, run another audit or send the help request before changing images or page content.",
             "Ask your Shopify theme designer to identify which main image or text appears late and help it appear sooner.",
         ),
         "cls": (
@@ -156,7 +156,7 @@ PLATFORM_ACTIONS = {
             "Ask Wix Support to investigate the slow first response before changing your page content.",
         ),
         "lcp": (
-            "In the Wix editor, check the first screen visitors see. Try one still image instead of a video or gallery, or turn off an entrance animation, then preview the result.",
+            "Reload the page and watch for the identified content appearing late. If no item was identified, run another audit or send the help request before changing images or page content.",
             "Ask Wix Support or your site designer to identify why the main image or text appears late.",
         ),
         "cls": (
@@ -182,7 +182,7 @@ PLATFORM_ACTIONS = {
             "Ask Squarespace Support to investigate the slow first response before changing your page content.",
         ),
         "lcp": (
-            "In the page editor, check the first screen visitors see. Try one still image instead of a video or gallery, then preview the result. The page-size guide below can help.",
+            "Reload the page and watch for the identified content appearing late. If no item was identified, run another audit or send the help request before changing images or page content.",
             "Ask your Squarespace site designer to identify which main image or text appears late and what is delaying it.",
         ),
         "cls": (
@@ -198,6 +198,10 @@ PLATFORM_ACTIONS = {
 
 
 GENERIC_ACTIONS = {
+    "lcp_text": (
+        "Find this text in your page editor. Reload the page and note whether it appears late or changes font. Leave font or code changes to your site designer if you are unsure how to undo them.",
+        "Ask your site designer to check what delays this text appearing, including fonts, page styles, and code that builds the page.",
+    ),
     "render_blocking": (
         "In your site editor, look for a recently added popup, animation, or other optional tool. In a draft, turn off one item and preview whether the page appears sooner.",
         "Ask your site designer or website provider to find which files delay the first visible content and help them load sooner.",
@@ -211,7 +215,7 @@ GENERIC_ACTIONS = {
         "Your hosting provider is the first contact. Ask it to check the server response and involve your site developer if it finds a code problem.",
     ),
     "lcp": (
-        "In your site editor, check the main image or banner visitors see first. In a draft, try one still image instead of a slideshow or video, then preview the result.",
+        "Reload the page and watch for the identified content appearing late. If no item was identified, run another audit or send the help request before changing images or page content.",
         "Ask your site designer or website provider to identify which main image or text appears late and what is delaying it.",
     ),
     "cls": (
@@ -227,9 +231,10 @@ GENERIC_ACTIONS = {
 
 def detect_platform(audits, page_url=""):
     """Suggest a platform from URLs already captured by Lighthouse."""
-    network_audit = (audits or {}).get("network-requests") or {}
-    details = network_audit.get("details") or {}
-    request_items = details.get("items") or []
+    network_audit = audits.get("network-requests") if isinstance(audits, dict) else None
+    details = network_audit.get("details") if isinstance(network_audit, dict) else None
+    request_items = details.get("items") if isinstance(details, dict) else None
+    request_items = request_items if isinstance(request_items, list) else []
     urls = [page_url.lower()]
     urls.extend(
         str(item.get("url", "")).lower()
@@ -247,6 +252,8 @@ def detect_platform(audits, page_url=""):
 
 def guidance_for(platform, fix_id):
     actions = PLATFORM_ACTIONS.get(platform, {}).get(fix_id) or GENERIC_ACTIONS[fix_id]
+    if fix_id == "lcp_text" and platform in PLATFORM_HELP:
+        actions = (actions[0], actions[1].replace("your site designer", f"your {platform} site designer"))
     # General platform help is shown once for the whole plan, not as a task-specific guide.
     help_resource = PLATFORM_FIX_HELP.get((platform, fix_id))
     return {

@@ -48,6 +48,17 @@ def audit_rows(result):
     lab = [row for row in rows if row["short"] in {"LCP", "CLS", "TBT"}]
     return lab, site_tester.build_field_metric_rows(result)
 
+def image_evidence_result():
+    from utils.fetch_lighthouse_data import extract_all_features
+    node = {"type": "node", "selector": "img.hero", "snippet": '<img src="https://example.com/hero.jpg">'}
+    return extract_all_features({"audits": {
+        "lcp-breakdown-insight": {"details": {"type": "list", "items": [node]}},
+        "image-delivery-insight": {"details": {"type": "table", "items": [
+            {"node": node, "url": "https://example.com/hero.jpg", "wastedBytes": 500000},
+        ]}},
+    }})
+
+
 def rendered_cards(app):
     cards = []
     for item in app.get("html"):
@@ -291,7 +302,7 @@ class RecommendationCardsTest(unittest.TestCase):
         issue = site_tester.build_priority_issues(lab, field, "URL")[0]
         with patch.object(site_tester.st, "html") as renderer:
             site_tester.render_recommendation_card(
-                issue, {"image-delivery-insight_savings_bytes": 500000}, "WordPress", 1,
+                issue, image_evidence_result(), "WordPress", 1,
             )
         card = "".join(call.args[0] for call in renderer.call_args_list)
         self.assertIn("Main content takes too long to appear", card)
@@ -322,6 +333,7 @@ class RecommendationCardsTest(unittest.TestCase):
         result = {
             "largest-contentful-paint": 9000, "field_largest-contentful-paint": 3200,
             "image-delivery-insight_savings_bytes": 500000,
+            "audit_items": image_evidence_result()["audit_items"],
         }
         lab, field = audit_rows(result)
         for scope in ("URL", "Origin", None):

@@ -1,10 +1,12 @@
 import html
 import math
+from urllib.parse import urlsplit
 
 import numpy as np
 import pandas as pd
 import streamlit as st
 
+from utils.audit_evidence import lcp_item, lcp_image_finding
 from utils.platform_guidance import PLATFORM_HELP, PLATFORM_OPTIONS, PLATFORM_SUPPORT, guidance_for
 
 
@@ -517,7 +519,10 @@ def fix_for_issue(issue, result):
                 ("uses-responsive-images_savings_bytes", "uses-optimized-images_savings_bytes"),
             ),
         ))
-        if image_savings:
+        image = lcp_image_finding(result)
+        if image and image_savings != 0:
+            image_savings = image["savings_bytes"]
+        if image_savings and image:
             return {
                 "fix_id": "images",
                 "title": "Make large images lighter to download",
@@ -539,6 +544,14 @@ def fix_for_issue(issue, result):
                 "label": "server response guide",
             }
 
+        if lcp_item(result) and lcp_item(result)["kind"] == "text":
+            return {
+                "fix_id": "lcp_text",
+                "title": "Check why the main text appears late",
+                "evidence": "The simulated test identified a text element as LCP. Identify what delayed it before changing images or fonts.",
+                "url": "https://web.dev/articles/optimize-lcp",
+                "label": "LCP optimization guide",
+            }
         return {
             "fix_id": "lcp",
             "title": "Check the main image or heading",
@@ -551,7 +564,7 @@ def fix_for_issue(issue, result):
         return {
             "fix_id": "cls",
             "title": "Find what makes the content move",
-            "evidence": "The layout movement was above target. This measurement does not identify which element moved.",
+            "evidence": "The layout movement was above target. A moving element may have been pushed by something else.",
             "url": "https://web.dev/articles/optimize-cls",
             "label": "CLS optimization guide",
         }
@@ -853,6 +866,52 @@ def render_benchmark_controls(metric_data, device):
     return category, comparison_scope
 
 
+def item_label(item):
+    if item["kind"] == "text":
+        return f'Text: "{item["label"][:120]}"'
+    if item.get("url"):
+        parsed = urlsplit(item["url"])
+        return (parsed.path.rsplit("/", 1)[-1] or parsed.hostname)[:120]
+    return item["label"][:120]
+
+
+def item_measurement(item):
+    if "savings_bytes" in item:
+        label = "estimated code unused during loading" if item["audit_id"] == "unused-javascript" else "estimated download reduction"
+        return f"{label}: {format_value(item['savings_bytes'], 'bytes')}"
+    if "cpu_ms" in item:
+        return f"CPU work during loading: {format_value(item['cpu_ms'], 'ms')}"
+    if "duration_ms" in item:
+        return f"reported blocking duration: {format_value(item['duration_ms'], 'ms')}"
+    if "shift_score" in item:
+        return f"recorded shift score: {item['shift_score']:.3f} (one shift, not the page total)"
+    return ""
+
+
+def owner_finding_for(issue, result, fix):
+    groups = result.get("audit_items", {})
+    group = {"render_blocking": "render_blocking", "cls": "layout", "javascript": "unused_scripts"}.get(fix["fix_id"])
+    items = groups.get(group, [])
+    if fix["fix_id"] == "javascript" and not items:
+        items = groups.get("script_work", [])
+    item = next(iter(items), None)
+    if fix["fix_id"] == "images":
+        item = lcp_image_finding(result)
+    if fix["fix_id"] in {"lcp", "lcp_text"}:
+        item = lcp_item(result)
+    if item:
+        label = "Main content identified in the simulated test" if fix["fix_id"] in {"lcp", "lcp_text", "images"} else "Item identified in the simulated test"
+        if fix["fix_id"] == "cls":
+            return f"Element observed moving in the simulated test: {item_label(item)}. Something else may have pushed it."
+        detail = item_measurement(item)
+        return f"{label}: {item_label(item)}." + (f" {detail[0].upper() + detail[1:]}." if detail else "")
+    if fix["fix_id"] == "server":
+        return "Check the first response for the tested page with your hosting provider."
+    if issue["issue_id"] == "lcp":
+        return "The audit did not identify the main content. Run another test; if this repeats, use the help request below."
+    return "The audit did not identify a specific item. Use the check above to investigate."
+
+
 def render_recommendation_card(issue, result, platform, rank):
     fix = fix_for_issue(issue, result)
     guidance = guidance_for(platform, fix["fix_id"])
@@ -885,6 +944,7 @@ def render_recommendation_card(issue, result, platform, rank):
             <div class="priority-fix">
                 <div class="priority-fix-label">Start with this</div>
                 <div class="priority-fix-title">{html.escape(fix['title'])}</div>
+                <p class="audit-finding">{html.escape(owner_finding_for(issue, result, fix))}</p>
                 <p>{html.escape(guidance['owner_action'])}</p>
                 {owner_guide}
             </div>
@@ -927,6 +987,7 @@ def help_request_for(issue, result, platform, page_url, device):
         "render_blocking": "Identify the CSS or scripts delaying the first render and LCP. Check which can be deferred or reduced without breaking the page.",
         "images": "Check image transfer sizes, responsive sizing, compression, and loading priority. Confirm which image, if any, is delaying LCP before changing it.",
         "server": "Investigate the initial server response, redirects, caching, and backend work. Confirm where the delay occurs before recommending hosting changes.",
+        "lcp_text": "The reported LCP element is text. Investigate font loading and font-display, render-blocking CSS, server response, and client-side rendering. Confirm the delay before changing fonts or images.",
         "lcp": "Identify the LCP element and separate server delay, resource loading, and render delay to find what makes it appear late.",
         "cls": "Identify the elements causing layout shifts and when they move. Check image dimensions and space reserved for banners, embeds, or other late-loading content.",
         "javascript": "Profile long tasks and event handlers. Identify any app, plugin, third-party script, or theme code contributing to the delay before removing or deferring it. Code unused during one test may still be needed.",
@@ -956,6 +1017,19 @@ def help_request_for(issue, result, platform, page_url, device):
         "Please report back with the confirmed cause, affected elements or resources, changes made (or proposed if work remains), and before-and-after results for the same page and simulated device. Check menus, forms, and checkout where present. If you cannot reproduce the problem, explain what you tested. Real-user results reflect 28 days and will not change immediately.",
         f"Technical reference: {fix['url']}",
     ])
+    groups = result.get("audit_items", {})
+    relevant = {"lcp": ("lcp", "render_blocking", "images"), "cls": ("layout",), "responsiveness": ("unused_scripts", "script_work")}[issue["issue_id"]]
+    evidence = []
+    for group in relevant:
+        for item in groups.get(group, []):
+            details = [item_label(item), item_measurement(item)]
+            details.extend(f"{key}: {item[key]}" for key in ("url", "selector", "snippet") if item.get(key))
+            evidence.append(f"- {group} [{item['audit_id']}]: " + "; ".join(value for value in details if value))
+    if evidence:
+        parts.append("Items reported by this simulated test (not element attribution from real-user data):\n" + "\n".join(evidence))
+        parts.append("Image savings do not establish an LCP cause unless investigated; a moving element may not be the cause of a shift. Do not add overlapping savings together.")
+    if issue["issue_id"] == "lcp" and not lcp_item(result):
+        parts.append("The LCP element was not identified. Reproduce the page under comparable test conditions, inspect the loading timeline, and check which content was visible and eligible for LCP. Do not assume the hero image was measured.")
     return "\n\n".join(parts)
 
 
@@ -1002,6 +1076,8 @@ def render_action_plan(result, metric_rows, field_rows, platform, limit=3):
 
 
 def render_overview(result, strategy, reference_label, metric_rows):
+    if clean_number(result.get("largest-contentful-paint")) is None:
+        st.warning("Loading speed could not be measured in the simulated test. Run another audit. Any available visitor results are shown separately below.")
     lab_rows = [
         row
         for row in metric_rows

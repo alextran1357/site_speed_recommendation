@@ -14,6 +14,8 @@ from utils import fetch_lighthouse_data
 
 # These cases include overlapping metrics and nested per-image savings on purpose.
 # https://github.com/GoogleChrome/lighthouse/tree/v13.0.0/core/audits/insights
+LCP_NODE = {"type": "node", "selector": "img.hero", "snippet": '<img src="https://example.com/hero.jpg">'}
+LCP_AUDIT = {"details": {"type": "list", "items": [LCP_NODE]}}
 INSIGHTS = {
     "render-blocking-insight": {
         "score": 0,
@@ -29,6 +31,7 @@ INSIGHTS = {
             "type": "table",
             "debugData": {"type": "debugdata", "wastedBytes": 204800},
             "items": [{
+                "url": "https://example.com/hero.jpg", "node": LCP_NODE,
                 "wastedBytes": 204800,
                 "subItems": {"type": "subitems", "items": [{"wastedBytes": 204800}]},
             }],
@@ -71,13 +74,13 @@ class LighthouseInsightsTest(unittest.TestCase):
         for audit_id, audit in INSIGHTS.items():
             key, value, fix_id, evidence = EXPECTED[audit_id]
             with self.subTest(audit=audit_id):
-                result = fetch_lighthouse_data.extract_all_features({"audits": {audit_id: audit}})
+                result = fetch_lighthouse_data.extract_all_features({"audits": {audit_id: audit, "lcp-breakdown-insight": LCP_AUDIT}})
                 self.assertEqual(result[key], value)
                 fix = site_tester.fix_for_issue({"issue_id": "lcp"}, result)
                 self.assertEqual(fix["fix_id"], fix_id)
                 self.assertIn(evidence, fix["evidence"])
                 app = AppTest.from_function(insight_card_preview)
-                app.session_state["audit_fixture"] = {audit_id: audit}
+                app.session_state["audit_fixture"] = {audit_id: audit, "lcp-breakdown-insight": LCP_AUDIT}
                 app.run(timeout=20)
                 self.assertFalse(app.exception)
                 self.assertIn(fix["title"], "".join(item.proto.body for item in app.get("html")))
@@ -158,7 +161,7 @@ class LighthouseInsightsTest(unittest.TestCase):
     def test_older_audits_still_support_recommendations(self):
         for audits, expected_fix in (
             ({"render-blocking-resources": {"details": {"overallSavingsMs": 350}}}, "render_blocking"),
-            ({"uses-responsive-images": {"details": {"overallSavingsBytes": 204800}}}, "images"),
+            ({"uses-responsive-images": {"details": {"overallSavingsBytes": 204800, "items": [{"node": LCP_NODE, "url": "https://example.com/hero.jpg", "wastedBytes": 204800}]}}, "largest-contentful-paint-element": LCP_AUDIT}, "images"),
             ({"network-server-latency": {"numericValue": 950}}, "server"),
         ):
             with self.subTest(fix=expected_fix):

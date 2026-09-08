@@ -5,16 +5,18 @@ import requests
 import streamlit as st
 
 from utils.platform_guidance import detect_platform
+from utils.audit_evidence import extract_audit_items, usable_audit, valid_number
 
 def extract_simple_numeric_values(result, audits, keys):
     for k in keys:
         audit = audits.get(k, {})
-        value = audit.get("numericValue")
+        value = valid_number(audit.get("numericValue"))
         result[k] = value
     return result
 
 def extract_field_values(result, field_data):
-    page_metrics = field_data.get("metrics", {})
+    page_metrics = field_data.get("metrics") if isinstance(field_data, dict) else None
+    page_metrics = page_metrics if isinstance(page_metrics, dict) else {}
     field_metrics = {
         "field_largest-contentful-paint": ("LARGEST_CONTENTFUL_PAINT_MS", 1),
         "field_cumulative-layout-shift": ("CUMULATIVE_LAYOUT_SHIFT_SCORE", 0.01),
@@ -22,17 +24,20 @@ def extract_field_values(result, field_data):
         "EXPERIMENTAL_TIME_TO_FIRST_BYTE": ("EXPERIMENTAL_TIME_TO_FIRST_BYTE", 1),
     }
     for result_key, (api_key, scale) in field_metrics.items():
-        value = page_metrics.get(api_key, {}).get("percentile")
+        metric = page_metrics.get(api_key)
+        value = valid_number(metric.get("percentile")) if isinstance(metric, dict) else None
         result[result_key] = None if value is None else value * scale
     return result
 
 def extract_resource_summary(result, audits):
     rs = audits.get("resource-summary", {}).get("details", {})
-    items = rs.get("items", [])
+    items = rs.get("items") if isinstance(rs.get("items"), list) else []
 
     for item in items:
+        if not isinstance(item, dict):
+            continue
         rtype = item.get("resourceType")
-        if not rtype:
+        if not isinstance(rtype, str) or not rtype:
             continue
         prefix = f"resource_{rtype.lower()}"
         result[f"{prefix}_bytes"] = item.get("transferSize")
@@ -42,12 +47,14 @@ def extract_resource_summary(result, audits):
 
 def extract_mainthread_breakdown(result, audits):
     mt = audits.get("mainthread-work-breakdown", {}).get("details", {})
-    items = mt.get("items", [])
+    items = mt.get("items") if isinstance(mt.get("items"), list) else []
 
     for item in items:
+        if not isinstance(item, dict):
+            continue
         group = item.get("group")
-        duration = item.get("duration")  # ms
-        if not group or duration is None:
+        duration = valid_number(item.get("duration"))  # ms
+        if not isinstance(group, str) or not group or duration is None:
             continue
         key = f"mainthread_{group}"
         result[key] = result.get(key, 0) + duration
@@ -65,8 +72,8 @@ def extract_opportunities(result, audits):
     for k in opportunity_keys:
         audit = audits.get(k, {})
         details = audit.get("details", {})
-        overall_savings_ms = details.get("overallSavingsMs")
-        overall_savings_bytes = details.get("overallSavingsBytes")
+        overall_savings_ms = valid_number(details.get("overallSavingsMs"))
+        overall_savings_bytes = valid_number(details.get("overallSavingsBytes"))
 
         if overall_savings_ms is not None:
             result[f"{k}_savings_ms"] = overall_savings_ms
@@ -111,7 +118,13 @@ def extract_insights(result, audits):
 
 
 def extract_all_features(data):
-    audits = data.get("audits") or {}
+    raw_audits = data.get("audits")
+    raw_audits = raw_audits if isinstance(raw_audits, dict) else {}
+    audits = {
+        key: {**audit, "details": audit.get("details") if isinstance(audit.get("details"), dict) else {}}
+        if usable_audit(audit) else {}
+        for key, audit in raw_audits.items()
+    }
     result = {
         "performance_score": data.get("performance_score"),
         "field_data_scope": data.get("field_data_scope"),
@@ -137,21 +150,26 @@ def extract_all_features(data):
     extract_mainthread_breakdown(result, audits)
     extract_opportunities(result, audits)
     extract_insights(result, audits)
+    result["audit_items"] = extract_audit_items(raw_audits, data.get("final_url") or "")
     return result
 
 
 def extract_useful_fields(data):
-    lighthouse = data.get("lighthouseResult", {})
+    lighthouse = data.get("lighthouseResult")
+    lighthouse = lighthouse if isinstance(lighthouse, dict) else {}
+    categories = lighthouse.get("categories")
+    performance = categories.get("performance") if isinstance(categories, dict) else None
     result = {
         "audits": lighthouse.get("audits", {}),
-        "performance_score": lighthouse.get("categories", {}).get("performance", {}).get("score"),
+        "final_url": lighthouse.get("finalDisplayedUrl") or lighthouse.get("finalUrl") or "",
+        "performance_score": valid_number(performance.get("score")) if isinstance(performance, dict) else None,
     }
     url_field_data = data.get("loadingExperience") or {}
     origin_field_data = data.get("originLoadingExperience") or {}
-    if url_field_data.get("metrics"):
+    if isinstance(url_field_data, dict) and isinstance(url_field_data.get("metrics"), dict) and url_field_data["metrics"]:
         result["field_data"] = url_field_data
         result["field_data_scope"] = "URL"
-    elif origin_field_data.get("metrics"):
+    elif isinstance(origin_field_data, dict) and isinstance(origin_field_data.get("metrics"), dict) and origin_field_data["metrics"]:
         result["field_data"] = origin_field_data
         result["field_data_scope"] = "Origin"
     else:
@@ -178,8 +196,12 @@ def fetch_data(url, strategy, api_key=None):
         print("PageSpeed request failed.")
         return {"error": "PageSpeed Insights could not complete the request."}
 
+    if not isinstance(data, dict):
+        return {"error": "PageSpeed Insights returned an unreadable response. Try another audit."}
     if not r.ok:
-        message = data.get("error", {}).get("message", f"PageSpeed Insights returned HTTP {r.status_code}.")
+        error = data.get("error")
+        message = error.get("message") if isinstance(error, dict) else None
+        message = message if isinstance(message, str) and message else f"PageSpeed Insights returned HTTP {r.status_code}."
         print(f"ERROR: {message}")
         return {"error": message}
 

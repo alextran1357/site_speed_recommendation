@@ -63,8 +63,6 @@ if submitted:
             st.error("The PageSpeed audit did not return usable data. Check the URL and try again.")
         elif result.get("error"):
             st.error(f"The PageSpeed audit failed: {result['error']}")
-        elif result.get("largest-contentful-paint") is None:
-            st.error("The audit completed, but LCP was unavailable for this URL.")
         else:
             st.session_state.result = result
             st.session_state.website = normalized_website
