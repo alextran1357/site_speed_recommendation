@@ -151,7 +151,9 @@ class BenchmarkRegressionTest(unittest.TestCase):
             fetch.assert_called_once()
             cards = [item.proto.body for item in app.get("html") if "<article " in item.proto.body]
             self.assertEqual(len(cards), 3)
-            self.assertTrue(all("Wix" in card for card in cards))
+            helpers = [item.proto.body for item in app.get("html") if 'class="priority-help"' in item.proto.body]
+            self.assertEqual(len(helpers), 3)
+            self.assertTrue(all("Wix" in helper for helper in helpers))
 
 
 class AuditExtractionTest(unittest.TestCase):

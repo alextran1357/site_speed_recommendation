@@ -80,8 +80,8 @@ class LighthouseInsightsTest(unittest.TestCase):
                 app.session_state["audit_fixture"] = {audit_id: audit}
                 app.run(timeout=20)
                 self.assertFalse(app.exception)
-                self.assertIn(fix["title"], app.get("html")[0].proto.body)
-                self.assertIn(evidence, app.get("html")[0].proto.body)
+                self.assertIn(fix["title"], "".join(item.proto.body for item in app.get("html")))
+                self.assertIn(evidence, "".join(item.proto.body for item in app.get("html")))
 
     def test_fetch_preserves_lab_field_and_platform_with_current_insights(self):
         response = Mock(ok=True)

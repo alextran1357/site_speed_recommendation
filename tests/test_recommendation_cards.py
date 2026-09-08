@@ -37,6 +37,7 @@ def recommendation_preview():
     }
     result["detected_platform"] = "WordPress"
     result["field_data_scope"] = "URL" if source == "Field" else None
+    st.session_state.website = "https://example.com/preview"
     st.session_state.result = result
     st.session_state.strategy = "Mobile"
     load_component(load_data())
@@ -46,6 +47,17 @@ def audit_rows(result):
     rows = site_tester.build_metric_rows(result, load_data(), "mobile", None, "All sites")
     lab = [row for row in rows if row["short"] in {"LCP", "CLS", "TBT"}]
     return lab, site_tester.build_field_metric_rows(result)
+
+def rendered_cards(app):
+    cards = []
+    for item in app.get("html"):
+        body = item.proto.body
+        if "<article " in body:
+            cards.append(body)
+        elif cards and ('class="priority-help"' in body or 'class="fix-evidence"' in body):
+            cards[-1] += body
+    return cards
+
 
 class RecommendationCardsTest(unittest.TestCase):
     def test_summary_explains_the_screenshot_results_in_plain_language(self):
@@ -172,7 +184,7 @@ class RecommendationCardsTest(unittest.TestCase):
         for rank in (1, 2):
             with self.subTest(rank=rank), patch.object(site_tester.st, "html") as renderer:
                 site_tester.render_recommendation_card(issue, {}, "WordPress", rank)
-                card = renderer.call_args.args[0]
+                card = "".join(call.args[0] for call in renderer.call_args_list)
                 self.assertIn("Website-wide real-user data", card)
                 if rank == 1:
                     self.assertIn("website-wide finding needs checking on this page", card)
@@ -199,7 +211,7 @@ class RecommendationCardsTest(unittest.TestCase):
                 self.assertFalse(app.exception)
                 bodies = [item.proto.body for item in app.tabs[0].get("html")]
                 summary = next(body for body in bodies if "meaning-card" in body)
-                cards = [body for body in bodies if "<article " in body]
+                cards = rendered_cards(app)
                 self.assertIn(expected_title, summary)
                 self.assertIn(first_title, cards[0])
                 self.assertIn("First ", cards[0])
@@ -246,7 +258,7 @@ class RecommendationCardsTest(unittest.TestCase):
         issue["Metric"] = '<script>alert("test")</script>'
         with patch.object(site_tester.st, "html") as html_renderer:
             site_tester.render_recommendation_card(issue, {}, "WordPress", rank=1)
-        rendered = html_renderer.call_args.args[0]
+        rendered = "".join(call.args[0] for call in html_renderer.call_args_list)
         self.assertNotIn("<script>", rendered)
         self.assertIn("&lt;script&gt;", rendered)
         self.assertIn("Highest priority", rendered)
@@ -254,7 +266,7 @@ class RecommendationCardsTest(unittest.TestCase):
     def test_supporting_actions_are_visible_and_structured(self):
         app = AppTest.from_function(recommendation_preview).run(timeout=20)
         self.assertFalse(app.exception)
-        cards = [item.proto.body for item in app.get("html") if '<article class="priority-card secondary-fix"' in item.proto.body]
+        cards = [card for card in rendered_cards(app) if "secondary-fix" in card]
         self.assertEqual(len(cards), 2)
         for rank, card in enumerate(cards, start=2):
             with self.subTest(rank=rank):
@@ -281,7 +293,7 @@ class RecommendationCardsTest(unittest.TestCase):
             site_tester.render_recommendation_card(
                 issue, {"image-delivery-insight_savings_bytes": 500000}, "WordPress", 1,
             )
-        card = renderer.call_args.args[0]
+        card = "".join(call.args[0] for call in renderer.call_args_list)
         self.assertIn("Main content takes too long to appear", card)
         self.assertIn("Visitors may wait longer", card)
         self.assertLess(card.index("Start with this"), card.index("Follow these steps:"))
@@ -306,6 +318,69 @@ class RecommendationCardsTest(unittest.TestCase):
             else:
                 self.assertNotIn("website overall", impact)
 
+    def test_help_request_uses_recommendation_evidence_and_correct_scope(self):
+        result = {
+            "largest-contentful-paint": 9000, "field_largest-contentful-paint": 3200,
+            "image-delivery-insight_savings_bytes": 500000,
+        }
+        lab, field = audit_rows(result)
+        for scope in ("URL", "Origin", None):
+            with self.subTest(scope=scope):
+                issue = site_tester.build_priority_issues([], field, scope)[0]
+                issue["lab_row"] = lab[0]
+                message = site_tester.help_request_for(issue, result, "WordPress", "https://example.com/shop?a=1&b=2", "Desktop")
+                self.assertIn("Page: https://example.com/shop?a=1&b=2", message)
+                self.assertIn("Simulated test device: Desktop", message)
+                self.assertIn("previous 28 days; all devices", message)
+                self.assertIn("3.20 s", message)
+                self.assertIn("9.00 s", message)
+                self.assertIn("image transfer sizes", message)
+                self.assertIn("WordPress site designer", message)
+                self.assertIn("do not confirm the root cause", message)
+                self.assertIn("before-and-after results", message)
+                if scope == "Origin":
+                    self.assertIn("whole website, not this page alone", message)
+                elif scope is None:
+                    self.assertIn("scope is unknown", message)
+                else:
+                    self.assertIn("Real-user data for this page", message)
+
+    def test_help_request_changes_investigation_and_contact_with_fix(self):
+        lab, _ = audit_rows({"largest-contentful-paint": 9000, "total-blocking-time": 800})
+        issue = next(item for item in site_tester.build_priority_issues(lab, []) if item["issue_id"] == "lcp")
+        for platform, expected_contact in (("WordPress", "hosting provider"), ("Shopify", "Shopify Support")):
+            message = site_tester.help_request_for(issue, {"document-latency-insight_server_response_ms": 950}, platform, "https://example.com", "Mobile")
+            self.assertIn(expected_contact, message)
+            self.assertIn("backend work", message)
+            self.assertIn("950 ms", message)
+            self.assertNotIn("image transfer sizes", message)
+            self.assertNotIn("Observed result (Real-user", message)
+        issue = next(item for item in site_tester.build_priority_issues(lab, []) if item["issue_id"] == "responsiveness")
+        message = site_tester.help_request_for(issue, {}, "Other / Not sure", None, None)
+        self.assertIn("[page address unavailable]", message)
+        self.assertIn("[device unavailable]", message)
+        self.assertIn("Profile long tasks", message)
+        self.assertIn("not a measurement of real-user INP", message)
+
+    def test_each_copy_preview_updates_when_audit_or_platform_changes(self):
+        app = AppTest.from_function(recommendation_preview).run(timeout=20)
+        self.assertFalse(app.exception)
+        messages = [item.value for item in app.code]
+        self.assertEqual(len(messages), 3)
+        self.assertIn("LCP element", messages[0])
+        self.assertIn("layout shifts", messages[1])
+        self.assertIn("Profile long tasks", messages[2])
+        self.assertTrue(all("https://example.com/preview" in message for message in messages))
+        self.assertTrue(all("Platform: WordPress" in message for message in messages))
+        app.selectbox[0].set_value("Lab")
+        app.selectbox[1].set_value("Shopify").run(timeout=20)
+        self.assertFalse(app.exception)
+        messages = [item.value for item in app.code]
+        self.assertEqual(len(messages), 3)
+        self.assertTrue(all("Platform: Shopify" in message for message in messages))
+        self.assertTrue(all("Observed result (Lighthouse simulated test)" in message for message in messages))
+        self.assertIn("Total Blocking Time", messages[0])
+
     def test_cards_bypass_markdown(self):
         rows = site_tester.build_field_metric_rows({"field_largest-contentful-paint": 9000})
         issue = site_tester.build_priority_issues([], rows)[0]
@@ -316,9 +391,9 @@ class RecommendationCardsTest(unittest.TestCase):
                 patch.object(site_tester.st, "markdown") as markdown,
             ):
                 site_tester.render_recommendation_card(issue, {}, "WordPress", rank=rank)
-                html_renderer.assert_called_once()
+                self.assertEqual(html_renderer.call_count, 3)
                 markdown.assert_not_called()
-                self.assertIn(f'aria-label="Recommendation {rank}"', html_renderer.call_args.args[0])
+                self.assertIn(f'aria-label="Recommendation {rank}"', html_renderer.call_args_list[0].args[0])
 
     def test_lab_cards_use_html_renderer(self):
         app = AppTest.from_function(recommendation_preview).run(timeout=20)
@@ -342,7 +417,7 @@ class RecommendationCardsTest(unittest.TestCase):
                 app.selectbox[1].set_value(platform).run(timeout=20)
                 self.assertFalse(app.exception)
                 output = [item.proto.body for item in app.get("html")]
-                cards = [body for body in output if "<article " in body]
+                cards = rendered_cards(app)
                 shared_help = [body for body in output if 'class="platform-help"' in body]
                 self.assertEqual(len(cards), 3)
                 support = PLATFORM_SUPPORT.get(platform)
@@ -366,7 +441,7 @@ class RecommendationCardsTest(unittest.TestCase):
                     )
                     self.assertEqual(elements[selector_index + 1].type, "html")
                     self.assertEqual(elements[selector_index + 1].proto.body, shared_help[0])
-                    self.assertLess(output.index(shared_help[0]), output.index(cards[0]))
+                    self.assertLess(output.index(shared_help[0]), next(index for index, body in enumerate(output) if "<article " in body))
                 else:
                     self.assertFalse(shared_help)
 

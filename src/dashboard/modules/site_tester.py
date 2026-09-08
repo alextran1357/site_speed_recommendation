@@ -236,11 +236,26 @@ def inject_dashboard_styles():
             .fix-evidence {font-size: 0.85rem; line-height: 1.5; color: #cbd5e1 !important; margin-top: 14px;}
             .resource-link.priority-link {border-color: #60a5fa;}
             .priority-card.secondary-fix {padding: 18px 20px; border-color: #334155;}
+            [class*="st-key-recommendation_"] {background: #1f2937; border: 1px solid #475569; border-radius: 8px; padding: 20px 22px; margin-bottom: 18px;}
+            [class*="st-key-recommendation_"]:has(.secondary-fix) {padding: 18px 20px; border-color: #334155;}
+            [class*="st-key-recommendation_"] .priority-card {border: 0; padding: 0; margin: 0;}
+            [class*="st-key-owner_help_"] {background: #273449; border-left: 3px solid #60a5fa; border-radius: 5px; padding: 12px 14px;}
+            [class*="st-key-owner_help_"] .priority-help {border: 0; padding: 0; margin: 0;}
+            [class*="st-key-owner_help_"] p {margin: 5px 0 0; color: #cbd5e1 !important; line-height: 1.45;}
+
+
             .secondary-fix .priority-title {font-size: 1.1rem;}
             .resource-link {display: inline-flex; align-items: center; box-sizing: border-box; max-width: 100%; min-height: 44px; padding: 9px 12px; border: 1px solid #64748b; border-radius: 6px; margin-top: 10px; color: #93c5fd !important; font-weight: 700; text-decoration: none; overflow-wrap: anywhere;}
             .resource-link:hover {background: #334155; text-decoration: underline;}
             .resource-link:focus-visible {outline: 2px solid #93c5fd; outline-offset: 3px;}
             .platform-help .resource-link {margin-top: 0; font-size: 0.875rem; font-weight: 600;}
+            [data-testid="stPopover"] button {border: 1px solid #64748b; background: #273449; color: #f8fafc;}
+            [data-testid="stPopoverBody"] {background: #1f2937; border: 1px solid #64748b;}
+            [data-testid="stPopoverBody"] > div {background: #1f2937;}
+            [data-testid="stPopoverBody"] [data-testid="stCode"] pre {background: #111827;}
+            [data-testid="stPopoverBody"] [data-testid="stCode"] code {color: #e2e8f0;}
+            [data-testid="stPopoverBody"] [data-testid="stCode"] > div {opacity: 1 !important; visibility: visible !important;}
+
             [data-testid="stSelectbox"] label[data-testid="stWidgetLabel"] {display: inline-flex !important; width: fit-content !important; align-items: center; gap: 4px;}
             [data-testid="stSelectbox"] label[data-testid="stWidgetLabel"] > div {flex: 0 0 auto !important; margin-left: 0 !important;}
             [data-testid="stSelectbox"] [data-testid="stTooltipIcon"] {margin-left: 0 !important;}
@@ -686,7 +701,17 @@ def render_data_source_header(title, context):
 
 
 def results_interpretation(lab_rows, field_rows, field_scope=None):
-    areas = {"LCP": "loading speed", "CLS": "layout stability", "INP": "responsiveness", "TBT": "main-thread blocking"}
+    areas = {"LCP": "loading speed", "CLS": "moving content", "INP": "click and tap response", "TBT": "response during loading"}
+    problems = {
+        "LCP": "the main content takes too long to appear",
+        "CLS": "content moves more than it should as the page loads",
+        "INP": "clicks and taps take too long to respond",
+    }
+    healthy = {
+        "LCP": "Main content appears within the recommended time.",
+        "CLS": "Content stays reasonably steady as the page loads.",
+        "INP": "Clicks and taps respond within the recommended time.",
+    }
     lab_available = [row for row in lab_rows if row["Status"] != "Unavailable"]
     field_available = [row for row in field_rows if row["Status"] != "Unavailable"]
     issue_statuses = {"Poor", "Needs improvement"}
@@ -698,44 +723,46 @@ def results_interpretation(lab_rows, field_rows, field_scope=None):
     if not lab_available and not field_available:
         return {
             "tone": "caution",
-            "title": "Performance measurements are unavailable",
-            "body": "There is not enough data to assess this page or recommend a first fix. Try another audit.",
+            "title": "There is not enough data to assess this page",
+            "body": "No usable performance measurements were returned. Run another audit before choosing a fix.",
         }
 
     if not field_available:
         tone = "caution"
-        title = "Only the lab test is available"
-        condition = "found performance problems" if lab_issues else "looks healthy in the available measurements"
-        body = f"This simulated test {condition}; there is not enough real-user data to confirm visitor experience."
+        title = "We only have a simulated test"
+        condition = "found possible problems" if lab_issues else "met the recommended targets for the measurements available"
+        body = f"The test {condition}. There is not enough real-user data to tell what visitors experience."
+        if lab_issues:
+            body += " Start with the checks below."
     else:
-        scope = {"URL": "for this page", "Origin": "across this website"}.get(field_scope, "with unknown page or website scope")
+        scope = {"URL": " for this page", "Origin": " across this website"}.get(field_scope, "")
         if field_issues:
             tone = "poor"
-            title = {
-                "URL": "Real-user problems on this page",
-                "Origin": "Website-wide real-user problems",
-            }.get(field_scope, "Real-user problems; scope unavailable")
-            problem_areas = ", ".join(areas[row["short"]] for row in field_issues)
-            body = f"Above-target real-user measurements {scope}: {problem_areas}."
-            if field_scope == "URL":
-                body += " Start with these page-level visitor problems."
-            else:
-                body += " These website or unscoped findings are ranked alongside lab findings by severity; confirm them on this page."
+            title = "Focus on " + " and ".join(areas[row["short"]] for row in field_issues)
+            symptoms = " and ".join(problems[row["short"]] for row in field_issues)
+            body = f"Real-user data{scope} shows that {symptoms}."
+            body += " " + " ".join(healthy[row["short"]] for row in field_available if row["Status"] == "Good")
+            body = body.rstrip()
         else:
             tone = "caution" if field_missing or field_scope != "URL" else ("mixed" if lab_issues else "good")
-            title = "Real-user data is incomplete" if field_missing else f"Real-user metrics {scope} look healthy"
-            healthy_areas = ", ".join(areas[row["short"]] for row in field_available)
-            body = f"Available real-user measurements {scope} are within target: {healthy_areas}."
-            if field_scope != "URL":
-                body += " This does not confirm that this specific page is healthy."
+            title = "Some visitor results are missing" if field_missing else "The available visitor results look good"
+            body = f"Real-user data{scope}: " + " ".join(healthy[row["short"]] for row in field_available)
 
+        if field_scope == "Origin":
+            body += " These results cover the whole website; they do not confirm how this particular page performs."
+        elif field_scope != "URL":
+            body += " We cannot tell whether these visitor results cover this page or the whole website."
         if field_missing:
-            body += f" Real-user data unavailable: {', '.join(field_missing)}."
-        if lab_issues:
-            body += " Use the lab findings below to investigate this page's performance."
+            body += f" We do not have visitor results for: {', '.join(field_missing)}."
+        if field_issues and field_scope == "URL":
+            body += " Start with the fixes below for these visitor problems."
+        elif lab_issues:
+            body += " The simulated test also found possible problems. Use the checks below to investigate this page."
+        elif field_issues:
+            body += " Use the checks below to see whether these problems affect this page."
 
     if lab_missing:
-        body += f" Lab data unavailable: {', '.join(lab_missing)}."
+        body += f" The simulated test has no result for: {', '.join(lab_missing)}."
     return {"tone": tone, "title": title, "body": body}
 
 
@@ -860,11 +887,24 @@ def render_recommendation_card(issue, result, platform, rank):
                 <div class="priority-fix-title">{html.escape(fix['title'])}</div>
                 <p>{html.escape(guidance['owner_action'])}</p>
                 {owner_guide}
-                <div class="priority-help">
-                    <div class="priority-fix-label">Prefer someone to fix it?</div>
-                    <p>{html.escape(guidance['help_action'])}</p>
-                </div>
             </div>
+        </article>
+        """
+    )
+    with st.container(key=f"owner_help_{issue['issue_id']}"):
+        st.html(
+            f'<div class="priority-help">'
+            f'<div class="priority-fix-label">Prefer someone to fix it?</div>'
+            f'<p>{html.escape(guidance["help_action"])}</p></div>'
+        )
+        with st.popover("Copy request for help", key=f"help_request_{issue['issue_id']}"):
+            st.caption("Use the copy icon, then paste this into a message to your helper.")
+            st.code(
+                help_request_for(issue, result, platform, st.session_state.get("website"), st.session_state.get("strategy")),
+                language=None, wrap_lines=True, height=320,
+            )
+    st.html(
+        f"""
             <div class="fix-evidence">
                 <strong>Supporting evidence</strong>
                 <div class="priority-measurement">
@@ -876,9 +916,47 @@ def render_recommendation_card(issue, result, platform, rank):
                 {peer_context}
                 <a class="resource-link" href="{html.escape(fix['url'], quote=True)}" target="_blank" rel="noopener">For your developer: {html.escape(fix['label'])}</a>
             </div>
-        </article>
         """
     )
+
+
+def help_request_for(issue, result, platform, page_url, device):
+    fix = fix_for_issue(issue, result)
+    guidance = guidance_for(platform, fix["fix_id"])
+    investigation = {
+        "render_blocking": "Identify the CSS or scripts delaying the first render and LCP. Check which can be deferred or reduced without breaking the page.",
+        "images": "Check image transfer sizes, responsive sizing, compression, and loading priority. Confirm which image, if any, is delaying LCP before changing it.",
+        "server": "Investigate the initial server response, redirects, caching, and backend work. Confirm where the delay occurs before recommending hosting changes.",
+        "lcp": "Identify the LCP element and separate server delay, resource loading, and render delay to find what makes it appear late.",
+        "cls": "Identify the elements causing layout shifts and when they move. Check image dimensions and space reserved for banners, embeds, or other late-loading content.",
+        "javascript": "Profile long tasks and event handlers. Identify any app, plugin, third-party script, or theme code contributing to the delay before removing or deferring it. Code unused during one test may still be needed.",
+    }[fix["fix_id"]]
+    if issue["source"] == "Field":
+        source = {
+            "URL": "Real-user data for this page",
+            "Origin": "Real-user data for the whole website, not this page alone",
+        }.get(issue.get("field_data_scope"), "Real-user data; page-versus-website scope is unknown")
+        source += "; previous 28 days; all devices"
+    else:
+        source = "Lighthouse simulated test"
+    parts = [
+        f"Please help investigate: {issue_title_for(issue)}.",
+        f"Page: {page_url or '[page address unavailable]'}\nPlatform: {platform}\nSimulated test device: {device or '[device unavailable]'}",
+        f"Observed result ({source}):\n{metric_title(issue)}: {issue['Current value']} ({issue['Status']}). {target_text_for(issue)}.",
+    ]
+    lab_row = issue.get("lab_row")
+    if issue["source"] == "Field" and lab_row and lab_row["raw_value"] is not None:
+        parts.append(f"Related Lighthouse result: {metric_title(lab_row)}: {lab_row['Current value']} ({lab_row['Status']}). {target_text_for(lab_row)}.")
+    if issue["issue_id"] == "responsiveness":
+        parts.append("TBT measures blocking during a simulated page load; it is not a measurement of real-user INP or proof of slow interactions.")
+    parts.extend([
+        f"Why this check was suggested: {fix['evidence']} These results do not confirm the root cause or guarantee an improvement.",
+        f"Who to involve: {guidance['help_action']}",
+        f"Please investigate: {investigation}",
+        "Please report back with the confirmed cause, affected elements or resources, changes made (or proposed if work remains), and before-and-after results for the same page and simulated device. Check menus, forms, and checkout where present. If you cannot reproduce the problem, explain what you tested. Real-user results reflect 28 days and will not change immediately.",
+        f"Technical reference: {fix['url']}",
+    ])
+    return "\n\n".join(parts)
 
 
 def render_action_plan(result, metric_rows, field_rows, platform, limit=3):
@@ -897,14 +975,13 @@ def render_action_plan(result, metric_rows, field_rows, platform, limit=3):
     for rank, issue in enumerate(issues, start=1):
         if rank == 2:
             st.markdown("#### Next priorities")
-        render_recommendation_card(issue, result, platform, rank)
+        with st.container(key=f"recommendation_{issue['issue_id']}"):
+            render_recommendation_card(issue, result, platform, rank)
 
     st.markdown("#### Get help with these fixes")
     st.write(
-        "Contact the person named on the card through your hosting account, app or theme support page, "
-        "or the agency that built your site. Send the page address, the selected mobile or desktop test, "
-        "and the recommendation with its supporting evidence. Ask them to investigate the suggested cause "
-        "and check the result after fixing it."
+        "Copy the request inside a recommendation and send it to the person named on the card. "
+        "Use your hosting account, app or theme support page, or the agency that built your site."
     )
     support = PLATFORM_SUPPORT.get(platform)
     if support:
