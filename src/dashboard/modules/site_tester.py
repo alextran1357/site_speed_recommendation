@@ -1111,7 +1111,7 @@ def render_action_plan(result, metric_rows, field_rows, platform, limit=3):
 
 
 def render_overview(result, strategy, reference_label, metric_rows):
-    if clean_number(result.get("largest-contentful-paint")) is None:
+    if clean_number(result.get("largest-contentful-paint")) is None and not result.get("lab_error"):
         st.warning("Loading speed could not be measured in the simulated test. Run another audit. Any available visitor results are shown separately below.")
     lab_rows = [
         row

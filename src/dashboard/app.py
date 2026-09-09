@@ -22,16 +22,21 @@ st.caption(
 )
 
 submitted = False
+retry = False
 if st.session_state.website_submitted:
     audit_col, action_col = st.columns([4, 1])
     with audit_col:
-        st.success(
-            f"Audit complete: {st.session_state.website} · {st.session_state.strategy}",
-            icon="✅",
-        )
+        if st.session_state.result.get("lab_error"):
+            st.warning(f"Partial results: {st.session_state.website} · {st.session_state.strategy}")
+        else:
+            st.success(
+                f"Audit complete: {st.session_state.website} · {st.session_state.strategy}",
+                icon="✅",
+            )
     with action_col:
         if st.button("Run another audit", width="stretch"):
             st.session_state.website_submitted = False
+            st.session_state.pop("audit_error", None)
             st.rerun()
 else:
     with st.form("website_submission_form"):
@@ -49,21 +54,38 @@ else:
         submitted = st.form_submit_button("Run PSI Audit", type="primary")
 
 
-if submitted:
+failure = st.session_state.get("audit_error")
+if st.session_state.website_submitted:
+    failure = st.session_state.result.get("lab_error")
+if failure:
+    st.warning(failure)
+    retry = st.button("Try again", type="primary")
+    if retry:
+        website, strategy = st.session_state.last_audit
+
+if submitted or retry:
     normalized_website = normalize_url(website)
     if not normalized_website:
         st.error("Enter a website URL before running the audit.")
     else:
-        st.session_state.website_submitted = False
+        st.session_state.last_audit = (normalized_website, strategy)
+        st.session_state.last_website_input = normalized_website
 
-        with st.spinner("Running PageSpeed Insights audit..."):
+        with st.spinner("Running PageSpeed Insights audit... If it fails, we'll retry once. This may take a few minutes."):
             result = fetch_data(normalized_website, strategy.lower())
 
-        if not isinstance(result, dict) or not result:
-            st.error("The PageSpeed audit did not return usable data. Check the URL and try again.")
-        elif result.get("error"):
-            st.error(f"The PageSpeed audit failed: {result['error']}")
+        if not isinstance(result, dict) or not result or result.get("error"):
+            st.session_state.audit_error = (
+                result.get("error") if isinstance(result, dict) and result.get("error")
+                else "The test could not finish. Please try again."
+            )
+            if st.session_state.website_submitted:
+                st.session_state.result["lab_error"] = (
+                    "The simulated test still could not finish. Your earlier real-user results are shown below."
+                )
+            st.rerun()
         else:
+            st.session_state.pop("audit_error", None)
             st.session_state.result = result
             st.session_state.website = normalized_website
             st.session_state.last_website_input = normalized_website

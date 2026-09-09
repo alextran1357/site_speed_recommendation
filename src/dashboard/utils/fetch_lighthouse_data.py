@@ -1,4 +1,6 @@
 """Fetch a PageSpeed audit and extract the fields used by the dashboard."""
+import time
+
 import requests
 import streamlit as st
 
@@ -171,36 +173,84 @@ def extract_useful_fields(data):
         result["field_data_scope"] = None
     return result
 
-def fetch_data(url, strategy, api_key=None):
-    if api_key is None:
-        api_key = st.secrets["API_KEY"]
-    api_url = "https://pagespeedonline.googleapis.com/pagespeedonline/v5/runPagespeed"
-
-    print("Calling PageSpeed API...")
-
+def _fetch_attempt(url, strategy, api_key):
     try:
-        r = requests.get(
-            api_url,
+        response = requests.get(
+            "https://pagespeedonline.googleapis.com/pagespeedonline/v5/runPagespeed",
             params={"url": url, "strategy": strategy, "key": api_key},
             timeout=120,
         )
-        data = r.json()
-    except (requests.RequestException, ValueError):
-        # Request exceptions can include the URL and its API key.
-        print("PageSpeed request failed.")
-        return {"error": "PageSpeed Insights could not complete the request."}
+    except requests.RequestException:
+        # Exceptions can contain the request URL and API key.
+        print("PageSpeed request failed: connection or timeout.")
+        return {"error": "The test could not finish. Please try again."}, True
 
-    if not isinstance(data, dict):
-        return {"error": "PageSpeed Insights returned an unreadable response. Try another audit."}
-    if not r.ok:
-        error = data.get("error")
+    try:
+        data = response.json()
+    except ValueError:
+        data = None
+    if not response.ok:
+        error = data.get("error") if isinstance(data, dict) else None
         message = error.get("message") if isinstance(error, dict) else None
-        message = message if isinstance(message, str) and message else f"PageSpeed Insights returned HTTP {r.status_code}."
-        print(f"ERROR: {message}")
-        return {"error": message}
+        message = message if isinstance(message, str) else "No error details supplied."
+        print(f"PageSpeed HTTP {response.status_code}: {message.replace(str(api_key), '[redacted]')}")
+        retryable = response.status_code in (408, 429) or response.status_code >= 500
+        return {"error": "The test could not finish. Please try again."}, retryable
+    if not isinstance(data, dict):
+        print("PageSpeed returned an unreadable response.")
+        return {"error": "The test could not finish. Please try again."}, True
 
     cleaned = extract_useful_fields(data)
+    lighthouse = data.get("lighthouseResult")
+    runtime_error = lighthouse.get("runtimeError") if isinstance(lighthouse, dict) else None
+    if runtime_error:
+        # A failed Lighthouse run must not supply measurements or recommendations.
+        cleaned["audits"] = {}
+        cleaned["performance_score"] = None
     result = extract_all_features(cleaned)
-    result["detected_platform"] = detect_platform(cleaned.get("audits", {}), url)
-    print(f"Completed url: {url}")
-    return result
+    lab_available = any(result.get(key) is not None for key in (
+        "largest-contentful-paint", "cumulative-layout-shift", "total-blocking-time",
+        "first-contentful-paint", "speed-index",
+    ))
+    if lab_available:
+        result["detected_platform"] = detect_platform(cleaned.get("audits", {}), url)
+        return result, False
+
+    code = runtime_error.get("code", "UNKNOWN") if isinstance(runtime_error, dict) else "MISSING_LAB_DATA"
+    print(f"Lighthouse test unavailable: {str(runtime_error or code).replace(str(api_key), '[redacted]')}")
+    field_available = any(result.get(key) is not None for key in (
+        "field_largest-contentful-paint", "field_cumulative-layout-shift",
+        "INTERACTION_TO_NEXT_PAINT", "EXPERIMENTAL_TIME_TO_FIRST_BYTE",
+    ))
+    if field_available:
+        result["lab_error"] = "The simulated test could not finish. Available real-user results are shown below."
+    else:
+        result = {"error": "The test could not finish. Please try again."}
+    retryable = code not in {
+        "INVALID_URL", "NOT_HTML", "INSECURE_DOCUMENT_REQUEST", "CHROME_INTERSTITIAL_ERROR",
+    }
+    return result, retryable
+
+
+def fetch_data(url, strategy, api_key=None):
+    if api_key is None:
+        try:
+            api_key = st.secrets["API_KEY"]
+        except (KeyError, FileNotFoundError):
+            api_key = None
+    if not api_key:
+        print("PageSpeed API key is not configured.")
+        return {"error": "Testing is temporarily unavailable. Please come back later."}
+
+    partial_result = None
+    for attempt in range(2):
+        result, retryable = _fetch_attempt(url, strategy, api_key)
+        if result.get("lab_error"):
+            partial_result = result
+        if not retryable:
+            break
+        if attempt == 0:
+            print("Retrying PageSpeed once.")
+            time.sleep(1)
+    # Keep visitor measurements if a later attempt fails completely.
+    return partial_result if result.get("error") and partial_result else result
