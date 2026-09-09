@@ -29,6 +29,9 @@ FIELD = {"loadingExperience": {"metrics": {"LARGEST_CONTENTFUL_PAINT_MS": {"perc
 
 class AuditRetryTest(unittest.TestCase):
     def setUp(self):
+        environment = patch.dict(fetcher.os.environ, {"API_KEY": ""})
+        environment.start()
+        self.addCleanup(environment.stop)
         sleeper = patch.object(fetcher.time, "sleep")
         self.sleep = sleeper.start()
         self.addCleanup(sleeper.stop)
@@ -83,6 +86,18 @@ class AuditRetryTest(unittest.TestCase):
         self.assertEqual(get.call_count, 1)
         self.assertEqual(result["cumulative-layout-shift"], 0.2)
         self.assertNotIn("error", result)
+
+    def test_api_key_sources(self):
+        for explicit, environment, secrets, expected in (
+            (None, {"API_KEY": "railway-key"}, {}, "railway-key"),
+            (None, {}, {"API_KEY": "streamlit-key"}, "streamlit-key"),
+            ("explicit-key", {"API_KEY": "railway-key"}, {}, "explicit-key"),
+        ):
+            with self.subTest(source=expected), patch.dict(fetcher.os.environ, {"API_KEY": "", **environment}), \
+                    patch.object(fetcher.st, "secrets", secrets), \
+                    patch.object(fetcher, "_fetch_attempt", return_value=({}, False)) as attempt:
+                fetcher.fetch_data("https://example.com", "mobile", api_key=explicit)
+                attempt.assert_called_once_with("https://example.com", "mobile", expected)
 
     def test_missing_key_and_logs_are_safe(self):
         with patch.object(fetcher.st, "secrets", {}), patch.object(fetcher.requests, "get") as get:

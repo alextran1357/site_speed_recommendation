@@ -132,7 +132,7 @@ Create `.streamlit/secrets.toml` with your Google PageSpeed Insights API key:
 API_KEY = "your-pagespeed-insights-api-key"
 ```
 
-This file is excluded from version control. The dashboard reads this Streamlit secret; the standalone collection scripts use their own configuration described below.
+This file is excluded from version control. The dashboard reads the `API_KEY` environment variable, falling back to this Streamlit secret; the standalone collection scripts use their own configuration described below.
 
 Start the application:
 
@@ -141,6 +141,14 @@ streamlit run src/dashboard/app.py
 ```
 
 Live audits require network access and an API key configured for PageSpeed Insights.
+
+## Deploy on Railway
+
+Connect this repository with the service root set to the repository root. Railway
+installs `requirements.txt`; `railway.toml` provides the Streamlit start command
+and health check. Add your PageSpeed Insights key as `API_KEY` in the service's
+Variables tab. Keep Serverless disabled to prevent idle sleeping, then deploy
+and generate a domain under Settings > Networking.
 
 ## Run checks
 

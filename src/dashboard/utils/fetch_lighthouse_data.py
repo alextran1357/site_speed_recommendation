@@ -1,4 +1,5 @@
 """Fetch a PageSpeed audit and extract the fields used by the dashboard."""
+import os
 import time
 
 import requests
@@ -233,6 +234,8 @@ def _fetch_attempt(url, strategy, api_key):
 
 
 def fetch_data(url, strategy, api_key=None):
+    if api_key is None:
+        api_key = os.environ.get("API_KEY") or None
     if api_key is None:
         try:
             api_key = st.secrets["API_KEY"]
