@@ -1,8 +1,4 @@
-'''
-Docstring for data_manipulation.feature_extractor
-
-Extract features from raw website speed jsons
-'''
+"""Flatten saved PageSpeed results into the historical benchmark CSV schema."""
 
 import json
 import pandas as pd
@@ -17,7 +13,7 @@ def extract_simple_numeric_values(audits, keys):
     for k in keys:
         audit = audits.get(k, {})
         value = audit.get("numericValue")
-        out[k] = value  # can be None if missing
+        out[k] = value
     return out
 
 def extract_field_values(field_data, keys):
@@ -26,14 +22,7 @@ def extract_field_values(field_data, keys):
     for k in keys:
         audit = page_metrics.get(k, {})
         value = audit.get("percentile")
-        out[k] = value  # can be None if missing
-    return out
-
-def extract_field_percentiles(field_data, keys):
-    page_metrics = field_data.get("metrics", {})   
-    out = {}
-    for k in keys:
-        audit = page_metrics.get(k,)
+        out[k] = value
     return out
 
 def extract_resource_summary(audits):
@@ -56,27 +45,6 @@ def extract_resource_summary(audits):
 
     return out
 
-# Lighthouse does not return an easy way to summarize third-party requests. This is no long in use.
-def extract_third_party_summary(audits):
-    """
-    From 'third-party-summary', pull total transfer + requests for third-party.
-    """
-    out = {}
-    tps = audits.get("third-party-summary", {}).get("details", {})
-    items = tps.get("items", [])
-    total_transfer = 0
-    total_requests = 0
-
-    for item in items:
-        # Each item typically is per third-party domain
-        total_transfer += item.get("transferSize", 0) or 0
-        total_requests += item.get("requestCount", 0) or 0
-
-    out["third_party_transfer_bytes"] = total_transfer or None
-    out["third_party_requests"] = total_requests or None
-    return out
-
-
 def extract_mainthread_breakdown(audits):
     """
     From 'mainthread-work-breakdown', sum ms per category.
@@ -86,7 +54,6 @@ def extract_mainthread_breakdown(audits):
     mt = audits.get("mainthread-work-breakdown", {}).get("details", {})
     items = mt.get("items", [])
 
-    # We'll aggregate by group label
     for item in items:
         group = item.get("group")
         duration = item.get("duration")  # ms
@@ -162,9 +129,6 @@ def extract_all_features(page_obj, domain, url, strategy):
         "unminified-javascript",
         "network-server-latency",
     ]
-    cache_type = [
-        "cache-insight",
-    ]
     field_keys = [
         "INTERACTION_TO_NEXT_PAINT",
         "EXPERIMENTAL_TIME_TO_FIRST_BYTE",
@@ -173,7 +137,6 @@ def extract_all_features(page_obj, domain, url, strategy):
     row.update(extract_simple_numeric_values(audits, core_keys))
     row.update(extract_simple_numeric_values(audits, extra_simple))
     row.update(extract_resource_summary(audits))
-    # row.update(extract_third_party_summary(audits))
     row.update(extract_mainthread_breakdown(audits))
     row.update(extract_opportunities(audits))
 

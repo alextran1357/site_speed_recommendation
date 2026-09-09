@@ -46,30 +46,12 @@ FEATURE_COLUMNS = [
     "strategy_mobile",
 ]
 
-DROP_COLUMNS = [
-    "performance_score",
-    "largest-contentful-paint",
-    "cumulative-layout-shift",
-    "first-contentful-paint",
-    "total-blocking-time",
-    "speed-index",
-    "interactive",
-    "mainthread_garbageCollection",
-    "EXPERIMENTAL_TIME_TO_FIRST_BYTE",
-    "INTERACTION_TO_NEXT_PAINT",
-]
-
-
 def predict(features, strategy):
     model = joblib.load(MODEL_PATH / "lcp_model.joblib")
-    row = pd.json_normalize(features).drop(columns=DROP_COLUMNS, errors="ignore")
+    row = pd.json_normalize(features)
 
-    if strategy == "desktop":
-        row["strategy_desktop"] = 1
-        row["strategy_mobile"] = 0
-    else:
-        row["strategy_desktop"] = 0
-        row["strategy_mobile"] = 1
+    row["strategy_desktop"] = int(strategy == "desktop")
+    row["strategy_mobile"] = int(strategy != "desktop")
 
     row = row.reindex(columns=FEATURE_COLUMNS)
     row = row.apply(pd.to_numeric, errors="coerce")

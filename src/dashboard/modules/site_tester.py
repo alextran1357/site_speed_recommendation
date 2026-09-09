@@ -548,7 +548,8 @@ def fix_for_issue(issue, result):
                 "label": "technical image guide",
             }
 
-        if lcp_item(result) and lcp_item(result)["kind"] == "text":
+        main_content = lcp_item(result)
+        if main_content and main_content["kind"] == "text":
             return {
                 "fix_id": "lcp_text",
                 "title": "Check why the main text appears late",
@@ -736,8 +737,10 @@ def results_interpretation(lab_rows, field_rows, field_scope=None):
     issue_statuses = {"Poor", "Needs improvement"}
     lab_issues = [row for row in lab_available if row["Status"] in issue_statuses]
     field_issues = [row for row in field_available if row["Status"] in issue_statuses]
-    field_missing = [areas[key] for key in ("LCP", "CLS", "INP") if key not in {row["short"] for row in field_available}]
-    lab_missing = [areas[key] for key in ("LCP", "CLS", "TBT") if key not in {row["short"] for row in lab_available}]
+    field_keys = {row["short"] for row in field_available}
+    lab_keys = {row["short"] for row in lab_available}
+    field_missing = [areas[key] for key in ("LCP", "CLS", "INP") if key not in field_keys]
+    lab_missing = [areas[key] for key in ("LCP", "CLS", "TBT") if key not in lab_keys]
 
     if not lab_available and not field_available:
         return {
@@ -906,15 +909,16 @@ def owner_finding_for(issue, result, fix):
     if fix["fix_id"] == "cls":
         if not item:
             return "The results show a movement problem, but the test did not identify which part moved."
-        label = " ".join(item.get("label", "").split())
+        words = item.get("label", "").split()
+        label = " ".join(words)
         # Keep page text recognizable without exposing selectors or long resource names.
         if (not label or label in {item.get("selector"), item.get("url")}
                 or label.lower() in {"div", "span", "img", "image", "video", "section", "main", "element"}
                 or any(char in label for char in "<>/{}[]=#_")
-                or max(map(len, label.split())) > 40):
+                or max(map(len, words)) > 40):
             return ""
-        if len(label) > 60 or len(label.split()) > 8:
-            excerpt = " ".join(label.split()[:8])
+        if len(label) > 60 or len(words) > 8:
+            excerpt = " ".join(words[:8])
             if len(excerpt) > 60:
                 excerpt = excerpt[:60].rsplit(" ", 1)[0]
             return f'The simulated test recorded movement in an area labelled “{excerpt.rstrip(". …")}…”. Watch that area and anything appearing above it.'

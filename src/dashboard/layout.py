@@ -1,3 +1,1 @@
-import fetch_lighthouse_data as fld
-
-website_url = ""
+"""Legacy dashboard scratch entry point; run app.py for the dashboard."""

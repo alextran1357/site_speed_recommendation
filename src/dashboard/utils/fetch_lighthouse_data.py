@@ -1,6 +1,4 @@
 """Fetch a PageSpeed audit and extract the fields used by the dashboard."""
-import math
-
 import requests
 import streamlit as st
 
@@ -104,16 +102,12 @@ def extract_insights(result, audits):
         # Keep unavailable new evidence explicit so old audits cannot override it.
         result[result_key] = None
         audit = audits[audit_id]
-        if not isinstance(audit, dict) or audit.get("scoreDisplayMode") in {
-            "error", "notApplicable", "manual",
-        } or audit.get("errorMessage"):
+        if not usable_audit(audit):
             continue
         value = audit
         for key in path:
             value = value.get(key) if isinstance(value, dict) else None
-        if (isinstance(value, (int, float)) and not isinstance(value, bool)
-                and math.isfinite(value) and value >= 0):
-            result[result_key] = value
+        result[result_key] = valid_number(value)
     return result
 
 

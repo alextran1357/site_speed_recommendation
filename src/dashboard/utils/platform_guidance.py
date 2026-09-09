@@ -89,114 +89,6 @@ PLATFORM_SUPPORT = {
 }
 
 
-PLATFORM_ACTIONS = {
-    "WordPress": {
-        "render_blocking": (
-            "Use the help request below to ask which files hold up the page. You do not need to edit code or turn off apps to start.",
-            "Ask your WordPress site designer to check the files holding up the page and contact their provider if needed.",
-        ),
-        "images": (
-            "Find the image listed above in your site editor and save the original. Try a copy with a smaller file size and check that it still looks clear. If you cannot find or safely replace it, use the help request below.",
-            "Ask your WordPress site designer to check the size of the image visitors actually download and replace it with a suitable smaller version.",
-        ),
-        "server": (
-            "Open your hosting account's support chat or ticket form. Ask whether it can investigate the slow first response and check page caching, which saves a ready-made version of a page.",
-            "Your hosting provider is the first contact. If it finds a theme or plugin problem, ask your WordPress site designer to follow up.",
-        ),
-        "lcp": (
-            "Reload the page and watch for the identified content appearing late. If no item was identified, run another audit or send the help request before changing images or page content.",
-            "Ask your WordPress site designer to identify which main content appears late and what is delaying it.",
-        ),
-        "cls": (
-            "Reload the page, then scroll slowly. Watch for images appearing, banners pushing content down, or text changing size. Note what moves and when; these are clues, not confirmed causes.",
-            "Send those observations to your WordPress site designer or the responsible plugin's support team. Ask them to find what causes the movement and how to prevent it.",
-        ),
-        "javascript": (
-            "In Plugins, look for a popup, chat tool, or animation you do not need. On a test copy, turn off one at a time and check whether the page responds better.",
-            "Ask the plugin's support team or your WordPress site designer to reduce the work that tool makes the browser do. Unused code in one test is not proof that a plugin can be deleted.",
-        ),
-    },
-    "Shopify": {
-        "render_blocking": (
-            "Use the help request below to ask which files hold up the page. You do not need to edit code or turn off apps to start.",
-            "Ask your Shopify theme designer to check the files holding up the page and contact their provider if needed.",
-        ),
-        "images": (
-            "Find the image listed above in your site editor and save the original. Try a copy with a smaller file size and check that it still looks clear. If you cannot find or safely replace it, use the help request below.",
-            "Ask your Shopify theme designer to check whether visitors download a larger image than the page needs.",
-        ),
-        "server": (
-            "Shopify manages your hosting. Repeat the test for the same page; if the first response remains slow, open Shopify Support using the link below.",
-            "Ask Shopify Support to investigate the slow first response and advise whether your theme designer or an app provider needs to help.",
-        ),
-        "lcp": (
-            "Reload the page and watch for the identified content appearing late. If no item was identified, run another audit or send the help request before changing images or page content.",
-            "Ask your Shopify theme designer to identify which main content appears late and help it appear sooner.",
-        ),
-        "cls": (
-            "Reload the page, then scroll slowly. Watch for images appearing, banners pushing content down, or text changing size. Note what moves and when; these are clues, not confirmed causes.",
-            "Ask the app provider or your Shopify theme designer to find what causes the movement and how to prevent it.",
-        ),
-        "javascript": (
-            "In a copy of your theme, open App embeds in the theme editor. Turn off one nonessential popup, chat tool, or animation and preview the result using the guide below.",
-            "Ask the app provider or your Shopify theme designer to reduce the work that tool makes the browser do. Do not uninstall an app just because some code was unused in this test.",
-        ),
-    },
-    "Wix": {
-        "render_blocking": (
-            "Use the help request below to ask which files hold up the page. You do not need to edit code or turn off apps to start.",
-            "Ask Wix Support or your site designer to check the files holding up the page and contact their provider if needed.",
-        ),
-        "images": (
-            "Find the image listed above in your site editor and save the original. Try a copy with a smaller file size and check that it still looks clear. If you cannot find or safely replace it, use the help request below.",
-            "Ask Wix Support or your site designer to check whether visitors download an image larger than the page needs.",
-        ),
-        "server": (
-            "Wix manages your hosting. Repeat the test for the same page; if the first response remains slow, open Wix Support using the link below.",
-            "Ask Wix Support to investigate the slow first response before changing your page content.",
-        ),
-        "lcp": (
-            "Reload the page and watch for the identified content appearing late. If no item was identified, run another audit or send the help request before changing images or page content.",
-            "Ask Wix Support or your site designer to identify why the main content appears late.",
-        ),
-        "cls": (
-            "Reload the page, then scroll slowly. Watch for images appearing, banners pushing content down, or text changing size. Note what moves and when; these are clues, not confirmed causes.",
-            "Ask Wix Support, your site designer, or the app provider to find what causes the movement and how to prevent it.",
-        ),
-        "javascript": (
-            "In the Wix editor, try turning off one nonessential animation or app feature. Use the guide below to review extra tools, and preview the page before publishing.",
-            "Ask Wix Support about built-in features or the app provider about outside tools. Ask them to reduce the work that makes the page slow to respond.",
-        ),
-    },
-    "Squarespace": {
-        "render_blocking": (
-            "Use the help request below to ask which files hold up the page. You do not need to edit code or turn off apps to start.",
-            "Ask your Squarespace site designer or Squarespace Support to check the files holding up the page.",
-        ),
-        "images": (
-            "Find the image listed above in your site editor and save the original. Try a copy with a smaller file size and check that it still looks clear. If you cannot find or safely replace it, use the help request below.",
-            "Ask your Squarespace site designer to check why the main image downloads slowly or at a larger size than needed.",
-        ),
-        "server": (
-            "Squarespace manages your hosting. Repeat the test for the same page; if the first response remains slow, open Squarespace Support using the link below.",
-            "Ask Squarespace Support to investigate the slow first response before changing your page content.",
-        ),
-        "lcp": (
-            "Reload the page and watch for the identified content appearing late. If no item was identified, run another audit or send the help request before changing images or page content.",
-            "Ask your Squarespace site designer to identify which main content appears late and what is delaying it.",
-        ),
-        "cls": (
-            "Reload the page, then scroll slowly. Watch for images appearing, banners pushing content down, or text changing size. Note what moves and when; these are clues, not confirmed causes.",
-            "Ask your Squarespace site designer or the tool's provider to find what causes the movement and how to prevent it.",
-        ),
-        "javascript": (
-            "In the page editor, try hiding one nonessential tool, such as a social feed or chat box, and preview the result. Ask your site designer to handle any custom code.",
-            "Ask your Squarespace site designer or the tool's provider to reduce the work that makes the page slow to respond.",
-        ),
-    },
-}
-
-
 GENERIC_ACTIONS = {
     "lcp_text": (
         "Find this text in your page editor. Reload the page and note whether it appears late or changes font. Leave font or code changes to your site designer if you are unsure how to undo them.",
@@ -227,6 +119,117 @@ GENERIC_ACTIONS = {
         "Ask your site designer or the tool's provider to reduce the work that makes the page slow to respond. Do not delete code just because it was unused in one test.",
     ),
 }
+
+
+PLATFORM_ACTIONS = {
+    "WordPress": {
+        "render_blocking": (
+            GENERIC_ACTIONS["render_blocking"][0],
+            "Ask your WordPress site designer to check the files holding up the page and contact their provider if needed.",
+        ),
+        "images": (
+            GENERIC_ACTIONS["images"][0],
+            "Ask your WordPress site designer to check the size of the image visitors actually download and replace it with a suitable smaller version.",
+        ),
+        "server": (
+            "Open your hosting account's support chat or ticket form. Ask whether it can investigate the slow first response and check page caching, which saves a ready-made version of a page.",
+            "Your hosting provider is the first contact. If it finds a theme or plugin problem, ask your WordPress site designer to follow up.",
+        ),
+        "lcp": (
+            GENERIC_ACTIONS["lcp"][0],
+            "Ask your WordPress site designer to identify which main content appears late and what is delaying it.",
+        ),
+        "cls": (
+            GENERIC_ACTIONS["cls"][0],
+            "Send those observations to your WordPress site designer or the responsible plugin's support team. Ask them to find what causes the movement and how to prevent it.",
+        ),
+        "javascript": (
+            "In Plugins, look for a popup, chat tool, or animation you do not need. On a test copy, turn off one at a time and check whether the page responds better.",
+            "Ask the plugin's support team or your WordPress site designer to reduce the work that tool makes the browser do. Unused code in one test is not proof that a plugin can be deleted.",
+        ),
+    },
+    "Shopify": {
+        "render_blocking": (
+            GENERIC_ACTIONS["render_blocking"][0],
+            "Ask your Shopify theme designer to check the files holding up the page and contact their provider if needed.",
+        ),
+        "images": (
+            GENERIC_ACTIONS["images"][0],
+            "Ask your Shopify theme designer to check whether visitors download a larger image than the page needs.",
+        ),
+        "server": (
+            "Shopify manages your hosting. Repeat the test for the same page; if the first response remains slow, open Shopify Support using the link below.",
+            "Ask Shopify Support to investigate the slow first response and advise whether your theme designer or an app provider needs to help.",
+        ),
+        "lcp": (
+            GENERIC_ACTIONS["lcp"][0],
+            "Ask your Shopify theme designer to identify which main content appears late and help it appear sooner.",
+        ),
+        "cls": (
+            GENERIC_ACTIONS["cls"][0],
+            "Ask the app provider or your Shopify theme designer to find what causes the movement and how to prevent it.",
+        ),
+        "javascript": (
+            "In a copy of your theme, open App embeds in the theme editor. Turn off one nonessential popup, chat tool, or animation and preview the result using the guide below.",
+            "Ask the app provider or your Shopify theme designer to reduce the work that tool makes the browser do. Do not uninstall an app just because some code was unused in this test.",
+        ),
+    },
+    "Wix": {
+        "render_blocking": (
+            GENERIC_ACTIONS["render_blocking"][0],
+            "Ask Wix Support or your site designer to check the files holding up the page and contact their provider if needed.",
+        ),
+        "images": (
+            GENERIC_ACTIONS["images"][0],
+            "Ask Wix Support or your site designer to check whether visitors download an image larger than the page needs.",
+        ),
+        "server": (
+            "Wix manages your hosting. Repeat the test for the same page; if the first response remains slow, open Wix Support using the link below.",
+            "Ask Wix Support to investigate the slow first response before changing your page content.",
+        ),
+        "lcp": (
+            GENERIC_ACTIONS["lcp"][0],
+            "Ask Wix Support or your site designer to identify why the main content appears late.",
+        ),
+        "cls": (
+            GENERIC_ACTIONS["cls"][0],
+            "Ask Wix Support, your site designer, or the app provider to find what causes the movement and how to prevent it.",
+        ),
+        "javascript": (
+            "In the Wix editor, try turning off one nonessential animation or app feature. Use the guide below to review extra tools, and preview the page before publishing.",
+            "Ask Wix Support about built-in features or the app provider about outside tools. Ask them to reduce the work that makes the page slow to respond.",
+        ),
+    },
+    "Squarespace": {
+        "render_blocking": (
+            GENERIC_ACTIONS["render_blocking"][0],
+            "Ask your Squarespace site designer or Squarespace Support to check the files holding up the page.",
+        ),
+        "images": (
+            GENERIC_ACTIONS["images"][0],
+            "Ask your Squarespace site designer to check why the main image downloads slowly or at a larger size than needed.",
+        ),
+        "server": (
+            "Squarespace manages your hosting. Repeat the test for the same page; if the first response remains slow, open Squarespace Support using the link below.",
+            "Ask Squarespace Support to investigate the slow first response before changing your page content.",
+        ),
+        "lcp": (
+            GENERIC_ACTIONS["lcp"][0],
+            "Ask your Squarespace site designer to identify which main content appears late and what is delaying it.",
+        ),
+        "cls": (
+            GENERIC_ACTIONS["cls"][0],
+            "Ask your Squarespace site designer or the tool's provider to find what causes the movement and how to prevent it.",
+        ),
+        "javascript": (
+            "In the page editor, try hiding one nonessential tool, such as a social feed or chat box, and preview the result. Ask your site designer to handle any custom code.",
+            "Ask your Squarespace site designer or the tool's provider to reduce the work that makes the page slow to respond.",
+        ),
+    },
+}
+
+
+
 
 
 def detect_platform(audits, page_url=""):
