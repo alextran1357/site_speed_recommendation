@@ -10,6 +10,19 @@ from utils.platform_guidance import GENERIC_ACTIONS, PLATFORM_HELP, detect_platf
 
 
 class PlatformGuidanceTest(unittest.TestCase):
+    def test_image_actions_preserve_the_identified_image_across_platforms(self):
+        from utils.platform_guidance import PLATFORM_OPTIONS
+        for platform in PLATFORM_OPTIONS:
+            with self.subTest(platform=platform):
+                action = guidance_for(platform, "images")["owner_action"]
+                self.assertIn("image listed above", action)
+                self.assertIn("save the original", action)
+                self.assertIn("smaller file size", action)
+                self.assertIn("still looks clear", action)
+                self.assertIn("help request", action)
+                self.assertNotIn("slideshow", action)
+                self.assertNotIn("video", action)
+
     def test_detects_platform_from_lighthouse_requests(self):
         audits = {
             "network-requests": {

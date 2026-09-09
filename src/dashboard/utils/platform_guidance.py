@@ -92,11 +92,11 @@ PLATFORM_SUPPORT = {
 PLATFORM_ACTIONS = {
     "WordPress": {
         "render_blocking": (
-            "In Plugins, check for a recently added visual effect or popup. On a test copy of your site, turn off one nonessential plugin and compare the page.",
-            "Ask your WordPress site designer or the plugin's support team to check what is delaying the first visible content.",
+            "Use the help request below to ask which files hold up the page. You do not need to edit code or turn off apps to start.",
+            "Ask your WordPress site designer to check the files holding up the page and contact their provider if needed.",
         ),
         "images": (
-            "Save a copy of the large image near the top of the page. Follow the image guide to reduce its file size, then replace it in the page editor and check that it still looks clear.",
+            "Find the image listed above in your site editor and save the original. Try a copy with a smaller file size and check that it still looks clear. If you cannot find or safely replace it, use the help request below.",
             "Ask your WordPress site designer to check the size of the image visitors actually download and replace it with a suitable smaller version.",
         ),
         "server": (
@@ -105,7 +105,7 @@ PLATFORM_ACTIONS = {
         ),
         "lcp": (
             "Reload the page and watch for the identified content appearing late. If no item was identified, run another audit or send the help request before changing images or page content.",
-            "Ask your WordPress site designer to identify which main image or text appears late and what is delaying it.",
+            "Ask your WordPress site designer to identify which main content appears late and what is delaying it.",
         ),
         "cls": (
             "Reload the page, then scroll slowly. Watch for images appearing, banners pushing content down, or text changing size. Note what moves and when; these are clues, not confirmed causes.",
@@ -118,11 +118,11 @@ PLATFORM_ACTIONS = {
     },
     "Shopify": {
         "render_blocking": (
-            "In a copy of your theme, check recently added app embeds (features an app adds to the page). Turn off one nonessential popup or visual effect and preview the page.",
-            "Ask the app provider or your Shopify theme designer to check which app or theme files delay the first visible content.",
+            "Use the help request below to ask which files hold up the page. You do not need to edit code or turn off apps to start.",
+            "Ask your Shopify theme designer to check the files holding up the page and contact their provider if needed.",
         ),
         "images": (
-            "In a copy of your theme, try one still image instead of a large slideshow or video at the top of the page. Check that product images still look clear.",
+            "Find the image listed above in your site editor and save the original. Try a copy with a smaller file size and check that it still looks clear. If you cannot find or safely replace it, use the help request below.",
             "Ask your Shopify theme designer to check whether visitors download a larger image than the page needs.",
         ),
         "server": (
@@ -131,7 +131,7 @@ PLATFORM_ACTIONS = {
         ),
         "lcp": (
             "Reload the page and watch for the identified content appearing late. If no item was identified, run another audit or send the help request before changing images or page content.",
-            "Ask your Shopify theme designer to identify which main image or text appears late and help it appear sooner.",
+            "Ask your Shopify theme designer to identify which main content appears late and help it appear sooner.",
         ),
         "cls": (
             "Reload the page, then scroll slowly. Watch for images appearing, banners pushing content down, or text changing size. Note what moves and when; these are clues, not confirmed causes.",
@@ -144,11 +144,11 @@ PLATFORM_ACTIONS = {
     },
     "Wix": {
         "render_blocking": (
-            "In the Wix editor, try turning off one animation or nonessential app near the top of the page. Preview the page before publishing.",
-            "Ask Wix Support about Wix features, or the app provider about an outside app, that may be delaying the first visible content.",
+            "Use the help request below to ask which files hold up the page. You do not need to edit code or turn off apps to start.",
+            "Ask Wix Support or your site designer to check the files holding up the page and contact their provider if needed.",
         ),
         "images": (
-            "In the Wix editor, try a smaller image or one still image instead of a large gallery or video near the top of the page. Follow the media guide and preview the result.",
+            "Find the image listed above in your site editor and save the original. Try a copy with a smaller file size and check that it still looks clear. If you cannot find or safely replace it, use the help request below.",
             "Ask Wix Support or your site designer to check whether visitors download an image larger than the page needs.",
         ),
         "server": (
@@ -157,7 +157,7 @@ PLATFORM_ACTIONS = {
         ),
         "lcp": (
             "Reload the page and watch for the identified content appearing late. If no item was identified, run another audit or send the help request before changing images or page content.",
-            "Ask Wix Support or your site designer to identify why the main image or text appears late.",
+            "Ask Wix Support or your site designer to identify why the main content appears late.",
         ),
         "cls": (
             "Reload the page, then scroll slowly. Watch for images appearing, banners pushing content down, or text changing size. Note what moves and when; these are clues, not confirmed causes.",
@@ -170,11 +170,11 @@ PLATFORM_ACTIONS = {
     },
     "Squarespace": {
         "render_blocking": (
-            "In the page editor, try turning off one animation or hiding a nonessential embedded tool, such as a video player or social feed. Preview the result before publishing.",
-            "Ask your Squarespace site designer or the tool's provider to check what delays the first visible content. Leave custom code changes to them if you are unfamiliar with it.",
+            "Use the help request below to ask which files hold up the page. You do not need to edit code or turn off apps to start.",
+            "Ask your Squarespace site designer or Squarespace Support to check the files holding up the page.",
         ),
         "images": (
-            "Save a copy of the large image near the top of the page. Follow the image guide to reduce its file size, then replace it in the page editor and check that it still looks clear.",
+            "Find the image listed above in your site editor and save the original. Try a copy with a smaller file size and check that it still looks clear. If you cannot find or safely replace it, use the help request below.",
             "Ask your Squarespace site designer to check why the main image downloads slowly or at a larger size than needed.",
         ),
         "server": (
@@ -183,7 +183,7 @@ PLATFORM_ACTIONS = {
         ),
         "lcp": (
             "Reload the page and watch for the identified content appearing late. If no item was identified, run another audit or send the help request before changing images or page content.",
-            "Ask your Squarespace site designer to identify which main image or text appears late and what is delaying it.",
+            "Ask your Squarespace site designer to identify which main content appears late and what is delaying it.",
         ),
         "cls": (
             "Reload the page, then scroll slowly. Watch for images appearing, banners pushing content down, or text changing size. Note what moves and when; these are clues, not confirmed causes.",
@@ -203,11 +203,11 @@ GENERIC_ACTIONS = {
         "Ask your site designer to check what delays this text appearing, including fonts, page styles, and code that builds the page.",
     ),
     "render_blocking": (
-        "In your site editor, look for a recently added popup, animation, or other optional tool. In a draft, turn off one item and preview whether the page appears sooner.",
+        "Use the help request below to ask which files hold up the page. You do not need to edit code or turn off apps to start.",
         "Ask your site designer or website provider to find which files delay the first visible content and help them load sooner.",
     ),
     "images": (
-        "Save a copy of the large image near the top of the page. Reduce its file size, replace it in your site editor, and check that it still looks clear. If you are unsure how, ask the person below.",
+        "Find the image listed above in your site editor and save the original. Try a copy with a smaller file size and check that it still looks clear. If you cannot find or safely replace it, use the help request below.",
         "Ask your site designer or website provider to check the size visitors actually download and supply a suitable smaller image.",
     ),
     "server": (
@@ -216,7 +216,7 @@ GENERIC_ACTIONS = {
     ),
     "lcp": (
         "Reload the page and watch for the identified content appearing late. If no item was identified, run another audit or send the help request before changing images or page content.",
-        "Ask your site designer or website provider to identify which main image or text appears late and what is delaying it.",
+        "Ask your site designer or website provider to identify which main content appears late and what is delaying it.",
     ),
     "cls": (
         "Reload the page, then scroll slowly. Watch for images appearing, banners pushing content down, or text changing size. Note what moves and when; these are clues, not confirmed causes.",

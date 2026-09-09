@@ -558,7 +558,7 @@ def fix_for_issue(issue, result):
             }
         return {
             "fix_id": "lcp",
-            "title": "Check the main image or heading",
+            "title": "Check what delays the main content",
             "evidence": "The main content took longer than the target to appear. This measurement does not identify the cause; start with the check above.",
             "url": "https://web.dev/articles/optimize-lcp",
             "label": "LCP optimization guide",
@@ -571,6 +571,17 @@ def fix_for_issue(issue, result):
             "evidence": "Content moved more than the recommended limit. This measurement does not explain why.",
             "url": "https://web.dev/articles/optimize-cls",
             "label": "CLS optimization guide",
+        }
+
+    script_time = clean_number(result.get("mainthread_scriptEvaluation"))
+    if script_time and script_time > 200:
+        return {
+            "fix_id": "javascript",
+            "title": "Reduce work while the page loads",
+            "evidence_group": "script_work",
+            "evidence": f"PSI measured {format_value(script_time, 'ms')} of script evaluation work.",
+            "url": "https://web.dev/articles/optimize-long-tasks",
+            "label": "long-task optimization guide",
         }
 
     unused_javascript_bytes = clean_number(result.get("unused-javascript_savings_bytes"))
@@ -588,17 +599,6 @@ def fix_for_issue(issue, result):
             "evidence": evidence,
             "url": "https://developer.chrome.com/docs/lighthouse/performance/unused-javascript",
             "label": "unused JavaScript guidance",
-        }
-
-    script_time = clean_number(result.get("mainthread_scriptEvaluation"))
-    if script_time and script_time > 200:
-        return {
-            "fix_id": "javascript",
-            "title": "Reduce work from apps and effects",
-            "evidence_group": "script_work",
-            "evidence": f"PSI measured {format_value(script_time, 'ms')} of script evaluation work.",
-            "url": "https://web.dev/articles/optimize-long-tasks",
-            "label": "long-task optimization guide",
         }
 
     return {
@@ -668,7 +668,7 @@ def issue_title_for(issue):
 
 def visitor_impact_for(issue):
     impacts = {
-        "lcp": "Visitors may wait longer to see the main image or text.",
+        "lcp": "Visitors may wait longer to see the main content.",
         "cls": "Moving content can interrupt reading or make visitors tap the wrong link.",
         "responsiveness": "Visitors may notice a delay after clicking a button or tapping a menu.",
     }
@@ -1010,18 +1010,18 @@ def help_request_for(issue, result, platform, page_url, device):
     fix = fix_for_issue(issue, result)
     guidance = guidance_for(platform, fix["fix_id"])
     investigation = {
-        "render_blocking": "Identify the CSS or scripts delaying the first render and LCP. Check which can be deferred or reduced without breaking the page.",
-        "images": "Check image transfer sizes, responsive sizing, compression, and loading priority. Confirm which image, if any, is delaying LCP before changing it.",
+        "render_blocking": "Trace the reported render-blocking CSS or scripts to the theme, platform, app, or other provider. Confirm their impact on first render and LCP before changing them. Check whether non-critical resources can be deferred or reduced while preserving required styles and script dependencies. Do not assume the files belong to a popup or plugin.",
+        "images": "Check the identified image URL and its actual transfer size, responsive sizing (srcset/sizes), compression, and loading priority. Confirm its contribution to LCP before changing it; estimated byte savings are not guaranteed time savings. Keep the same image content unless a replacement is agreed, and verify quality and layout on mobile and desktop. Do not assume a slideshow or video is present.",
         "server": "Investigate the initial server response, redirects, caching, and backend work. Confirm where the delay occurs before recommending hosting changes.",
         "lcp_text": "The reported LCP element is text. Investigate font loading and font-display, render-blocking CSS, server response, and client-side rendering. Confirm the delay before changing fonts or images.",
-        "lcp": "Identify the LCP element and separate server delay, resource loading, and render delay to find what makes it appear late.",
+        "lcp": "Confirm the reported LCP element, whether image, text, video, or another eligible element; if unavailable, reproduce the page and identify it. Separate server delay, resource loading, and render delay to find what makes it appear late before recommending changes.",
         "cls": "Identify the elements causing layout shifts and when they move. Check image dimensions and space reserved for banners, embeds, or other late-loading content.",
         "javascript": "Profile long tasks and event handlers. Identify any app, plugin, third-party script, or theme code contributing to the delay before removing or deferring it. Code unused during one test may still be needed.",
     }[fix["fix_id"]]
     if fix.get("evidence_group") == "unused_scripts":
         investigation = "Identify which tools supply the reported unused JavaScript and whether that code can load only when needed. Check other pages and interactions before removing it; unused bytes do not establish processing time or an INP cause."
     elif fix.get("evidence_group") == "script_work":
-        investigation = "Profile the scripts with reported CPU work during loading. Check long tasks and event handlers before deciding what to reduce or defer; loading work does not establish an INP cause."
+        investigation = "Profile the scripts with reported CPU work during loading. Check long tasks and event handlers before deciding what to reduce or defer; loading work does not establish an INP cause. Investigate the measured processing work first. Treat unused-code findings as additional context, not a measure of CPU time."
     if issue["source"] == "Field":
         source = {
             "URL": "Real-user data for this page",

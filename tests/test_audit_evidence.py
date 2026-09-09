@@ -61,6 +61,73 @@ class AuditEvidenceTest(unittest.TestCase):
         finding = site_tester.owner_finding_for(issue, result, site_tester.fix_for_issue(issue, result))
         self.assertNotIn(".js", finding)
 
+    def test_processing_precedes_unused_code_and_keeps_both_in_request(self):
+        groups = extract_audit_items({
+            "unused-javascript": table([{"url": "https://example.com/unused.js", "wastedBytes": 1}]),
+            "bootup-time": table([{"url": "https://example.com/busy.js", "total": 3000}]),
+        })
+        result = {"mainthread_scriptEvaluation": 3000, "unused-javascript_savings_bytes": 1,
+                  "audit_items": groups, "INTERACTION_TO_NEXT_PAINT": 400}
+        issue = issue_for(result, "responsiveness")
+        fix = site_tester.fix_for_issue(issue, result)
+        self.assertEqual(fix["evidence_group"], "script_work")
+        finding = site_tester.owner_finding_for(issue, result, fix)
+        self.assertIn("busy.js", finding)
+        self.assertNotIn("unused.js", finding)
+        message = site_tester.help_request_for(issue, result, "Shopify", "https://example.com", "Mobile")
+        for detail in ("busy.js", "unused.js", "CPU", "not a measure of CPU time", "not a measurement of real-user INP"):
+            self.assertIn(detail, message)
+        for value in (200, 0, None, float("nan"), -1):
+            result["mainthread_scriptEvaluation"] = value
+            self.assertEqual(site_tester.fix_for_issue(issue, result)["evidence_group"], "unused_scripts")
+
+    def test_lcp_wording_covers_image_text_video_and_missing_details(self):
+        from utils.platform_guidance import PLATFORM_OPTIONS
+        video = {"type": "node", "selector": "video.intro", "nodeLabel": "Welcome video", "snippet": '<video class="intro"></video>'}
+        for node, expected in ((IMAGE, "lcp"), (TEXT, "lcp_text"), (video, "lcp"), (None, "lcp")):
+            with self.subTest(node=node):
+                result = {"field_largest-contentful-paint": 5000,
+                          "audit_items": extract_audit_items({"lcp-breakdown-insight": lcp_audit(node)}) if node else {}}
+                issue = issue_for(result)
+                fix = site_tester.fix_for_issue(issue, result)
+                self.assertEqual(fix["fix_id"], expected)
+                if expected == "lcp":
+                    self.assertEqual(fix["title"], "Check what delays the main content")
+                for platform in PLATFORM_OPTIONS:
+                    with patch.object(site_tester.st, "html") as render:
+                        site_tester.render_recommendation_card(issue, result, platform, 1)
+                    body = " ".join(call.args[0] for call in render.call_args_list)
+                    self.assertNotIn("main image or text", body)
+                    self.assertNotIn("image or heading", body)
+                    if node is None:
+                        self.assertIn("did not identify the main content", body)
+                message = site_tester.help_request_for(issue, result, "Shopify", "https://example.com", "Mobile")
+                if node:
+                    self.assertIn(node["selector"], message)
+                if expected == "lcp_text":
+                    self.assertIn("font-display", message)
+                else:
+                    self.assertIn("server delay, resource loading, and render delay", message)
+
+    def test_blocking_advice_uses_file_evidence_without_assuming_an_app(self):
+        from utils.platform_guidance import PLATFORM_OPTIONS
+        for items in ([{"url": "https://example.com/theme.css", "wastedMs": 350}], []):
+            result = {"field_largest-contentful-paint": 5000, "render-blocking-insight_lcp_savings_ms": 350,
+                      "audit_items": extract_audit_items({"render-blocking-insight": table(items)})}
+            issue = issue_for(result)
+            for platform in PLATFORM_OPTIONS:
+                guidance = guidance_for(platform, "render_blocking")
+                self.assertIn("help request", guidance["owner_action"])
+                self.assertNotIn("popup", guidance["owner_action"])
+                self.assertNotIn("animation", guidance["owner_action"])
+                with patch.object(site_tester.st, "html") as render:
+                    site_tester.render_recommendation_card(issue, result, platform, 1)
+                body = render.call_args_list[0].args[0]
+                self.assertIn("theme.css" if items else "specific blocking file", body)
+                message = site_tester.help_request_for(issue, result, platform, "https://example.com", "Mobile")
+                self.assertIn("script dependencies", message)
+                self.assertIn("Do not assume", message)
+
     def test_missing_blocking_file_does_not_claim_lcp_is_missing(self):
         for node in (TEXT, IMAGE, None):
             with self.subTest(node=node):
