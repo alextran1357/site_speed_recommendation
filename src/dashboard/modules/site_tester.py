@@ -454,7 +454,8 @@ def issue_priority_score(issue):
     distance = (value / target) if value is not None and target else 0
     is_field = issue["source"] == "Field"
     page_field = is_field and issue.get("field_data_scope") == "URL"
-    return page_field, severity, is_field, distance
+    is_core_web_vital = issue["short"] in {"LCP", "CLS", "INP"}
+    return is_core_web_vital, page_field, severity, is_field, distance
 
 
 def build_priority_issues(metric_rows, field_rows, field_scope=None):
@@ -480,9 +481,11 @@ def build_priority_issues(metric_rows, field_rows, field_scope=None):
 
 
 def priority_reason_for(issue):
+    if issue["short"] == "TBT":
+        return "First because no above-target Core Web Vital was found in the available results. This is a lab finding to investigate; missing results do not mean a pass."
     if issue["source"] == "Field" and issue.get("field_data_scope") == "URL":
         return "First because this page has an above-target real-user measurement; page-level visitor problems take priority."
-    reason = "First by severity, using real-user evidence to break ties, then distance above target."
+    reason = "First among Core Web Vitals by severity, using real-user evidence to break ties, then distance above target. Core Web Vitals take priority over TBT."
     if issue["source"] == "Lab":
         return reason + " This is a lab finding to investigate."
     if issue.get("field_data_scope") == "Origin":
@@ -499,6 +502,20 @@ def fix_for_issue(issue, result):
     issue_id = issue["issue_id"]
 
     if issue_id == "lcp":
+        server_latency = clean_number(result.get(
+            "document-latency-insight_server_response_ms",
+            result.get("network-server-latency"),
+        ))
+        # Investigate a slow first response before downstream loading work.
+        if server_latency and server_latency > 800:
+            return {
+                "fix_id": "server",
+                "title": "Ask about the slow first response",
+                "evidence": f"PSI measured {format_value(server_latency, 'ms')} of server latency. Check this first because page loading waits for the initial response.",
+                "url": "https://web.dev/articles/optimize-ttfb",
+                "label": "server response guide",
+            }
+
         render_savings = clean_number(result.get(
             "render-blocking-insight_lcp_savings_ms",
             result.get("render-blocking-resources_savings_ms"),
@@ -531,19 +548,6 @@ def fix_for_issue(issue, result):
                 "label": "technical image guide",
             }
 
-        server_latency = clean_number(result.get(
-            "document-latency-insight_server_response_ms",
-            result.get("network-server-latency"),
-        ))
-        if server_latency and server_latency > 800:
-            return {
-                "fix_id": "server",
-                "title": "Ask about the slow first response",
-                "evidence": f"PSI measured {format_value(server_latency, 'ms')} of server latency.",
-                "url": "https://web.dev/articles/optimize-ttfb",
-                "label": "server response guide",
-            }
-
         if lcp_item(result) and lcp_item(result)["kind"] == "text":
             return {
                 "fix_id": "lcp_text",
@@ -564,7 +568,7 @@ def fix_for_issue(issue, result):
         return {
             "fix_id": "cls",
             "title": "Find what makes the content move",
-            "evidence": "The layout movement was above target. A moving element may have been pushed by something else.",
+            "evidence": "Content moved more than the recommended limit. This measurement does not explain why.",
             "url": "https://web.dev/articles/optimize-cls",
             "label": "CLS optimization guide",
         }
@@ -580,6 +584,7 @@ def fix_for_issue(issue, result):
         return {
             "fix_id": "javascript",
             "title": "Review tools that add extra code",
+            "evidence_group": "unused_scripts",
             "evidence": evidence,
             "url": "https://developer.chrome.com/docs/lighthouse/performance/unused-javascript",
             "label": "unused JavaScript guidance",
@@ -590,6 +595,7 @@ def fix_for_issue(issue, result):
         return {
             "fix_id": "javascript",
             "title": "Reduce work from apps and effects",
+            "evidence_group": "script_work",
             "evidence": f"PSI measured {format_value(script_time, 'ms')} of script evaluation work.",
             "url": "https://web.dev/articles/optimize-long-tasks",
             "label": "long-task optimization guide",
@@ -654,7 +660,7 @@ def issue_title_for(issue):
     if issue["issue_id"] == "lcp":
         return "Main content takes too long to appear"
     if issue["issue_id"] == "cls":
-        return "Content moves while the page loads"
+        return "Content moves unexpectedly" if issue["source"] == "Field" else "Content moves while the page loads"
     if issue["source"] == "Lab":
         return "The page may be slow to respond"
     return "Clicks and taps take too long to respond"
@@ -890,23 +896,41 @@ def item_measurement(item):
 
 def owner_finding_for(issue, result, fix):
     groups = result.get("audit_items", {})
-    group = {"render_blocking": "render_blocking", "cls": "layout", "javascript": "unused_scripts"}.get(fix["fix_id"])
+    group = fix.get("evidence_group") or {"render_blocking": "render_blocking", "cls": "layout"}.get(fix["fix_id"])
     items = groups.get(group, [])
-    if fix["fix_id"] == "javascript" and not items:
-        items = groups.get("script_work", [])
     item = next(iter(items), None)
     if fix["fix_id"] == "images":
         item = lcp_image_finding(result)
     if fix["fix_id"] in {"lcp", "lcp_text"}:
         item = lcp_item(result)
+    if fix["fix_id"] == "cls":
+        if not item:
+            return "The results show a movement problem, but the test did not identify which part moved."
+        label = " ".join(item.get("label", "").split())
+        # Keep page text recognizable without exposing selectors or long resource names.
+        if (not label or label in {item.get("selector"), item.get("url")}
+                or label.lower() in {"div", "span", "img", "image", "video", "section", "main", "element"}
+                or any(char in label for char in "<>/{}[]=#_")
+                or max(map(len, label.split())) > 40):
+            return ""
+        if len(label) > 60 or len(label.split()) > 8:
+            excerpt = " ".join(label.split()[:8])
+            if len(excerpt) > 60:
+                excerpt = excerpt[:60].rsplit(" ", 1)[0]
+            return f'The simulated test recorded movement in an area labelled “{excerpt.rstrip(". …")}…”. Watch that area and anything appearing above it.'
+        return f'The simulated test recorded movement around “{label}”. Watch whether it moves as other content appears.'
     if item:
         label = "Main content identified in the simulated test" if fix["fix_id"] in {"lcp", "lcp_text", "images"} else "Item identified in the simulated test"
-        if fix["fix_id"] == "cls":
-            return f"Element observed moving in the simulated test: {item_label(item)}. Something else may have pushed it."
         detail = item_measurement(item)
         return f"{label}: {item_label(item)}." + (f" {detail[0].upper() + detail[1:]}." if detail else "")
     if fix["fix_id"] == "server":
         return "Check the first response for the tested page with your hosting provider."
+    if fix["fix_id"] == "render_blocking":
+        return "The test found a possible delay from styles or scripts but did not identify a specific blocking file. Use the help request below."
+    if fix["fix_id"] == "javascript":
+        activity = {"unused_scripts": "unused code", "script_work": "script processing"}.get(group)
+        if activity:
+            return f"The test reported {activity} but did not identify a matching file. Use the help request below."
     if issue["issue_id"] == "lcp":
         return "The audit did not identify the main content. Run another test; if this repeats, use the help request below."
     return "The audit did not identify a specific item. Use the check above to investigate."
@@ -916,6 +940,8 @@ def render_recommendation_card(issue, result, platform, rank):
     fix = fix_for_issue(issue, result)
     guidance = guidance_for(platform, fix["fix_id"])
     owner_guide = owner_guide_for(guidance)
+    finding = owner_finding_for(issue, result, fix)
+    finding_html = f'<p class="audit-finding">{html.escape(finding)}</p>' if finding else ""
     is_primary = rank == 1
     css_class = "priority-card" if is_primary else "priority-card secondary-fix"
     source = "Lighthouse lab test"
@@ -944,7 +970,7 @@ def render_recommendation_card(issue, result, platform, rank):
             <div class="priority-fix">
                 <div class="priority-fix-label">Start with this</div>
                 <div class="priority-fix-title">{html.escape(fix['title'])}</div>
-                <p class="audit-finding">{html.escape(owner_finding_for(issue, result, fix))}</p>
+                {finding_html}
                 <p>{html.escape(guidance['owner_action'])}</p>
                 {owner_guide}
             </div>
@@ -992,6 +1018,10 @@ def help_request_for(issue, result, platform, page_url, device):
         "cls": "Identify the elements causing layout shifts and when they move. Check image dimensions and space reserved for banners, embeds, or other late-loading content.",
         "javascript": "Profile long tasks and event handlers. Identify any app, plugin, third-party script, or theme code contributing to the delay before removing or deferring it. Code unused during one test may still be needed.",
     }[fix["fix_id"]]
+    if fix.get("evidence_group") == "unused_scripts":
+        investigation = "Identify which tools supply the reported unused JavaScript and whether that code can load only when needed. Check other pages and interactions before removing it; unused bytes do not establish processing time or an INP cause."
+    elif fix.get("evidence_group") == "script_work":
+        investigation = "Profile the scripts with reported CPU work during loading. Check long tasks and event handlers before deciding what to reduce or defer; loading work does not establish an INP cause."
     if issue["source"] == "Field":
         source = {
             "URL": "Real-user data for this page",
@@ -1012,6 +1042,7 @@ def help_request_for(issue, result, platform, page_url, device):
         parts.append("TBT measures blocking during a simulated page load; it is not a measurement of real-user INP or proof of slow interactions.")
     parts.extend([
         f"Why this check was suggested: {fix['evidence']} These results do not confirm the root cause or guarantee an improvement.",
+        f"Starting check: {owner_finding_for(issue, result, fix) or guidance['owner_action']}",
         f"Who to involve: {guidance['help_action']}",
         f"Please investigate: {investigation}",
         "Please report back with the confirmed cause, affected elements or resources, changes made (or proposed if work remains), and before-and-after results for the same page and simulated device. Check menus, forms, and checkout where present. If you cannot reproduce the problem, explain what you tested. Real-user results reflect 28 days and will not change immediately.",
@@ -1026,7 +1057,7 @@ def help_request_for(issue, result, platform, page_url, device):
             details.extend(f"{key}: {item[key]}" for key in ("url", "selector", "snippet") if item.get(key))
             evidence.append(f"- {group} [{item['audit_id']}]: " + "; ".join(value for value in details if value))
     if evidence:
-        parts.append("Items reported by this simulated test (not element attribution from real-user data):\n" + "\n".join(evidence))
+        parts.append("Additional context from this simulated test (not element attribution from real-user data; not confirmed causes):\n" + "\n".join(evidence))
         parts.append("Image savings do not establish an LCP cause unless investigated; a moving element may not be the cause of a shift. Do not add overlapping savings together.")
     if issue["issue_id"] == "lcp" and not lcp_item(result):
         parts.append("The LCP element was not identified. Reproduce the page under comparable test conditions, inspect the loading timeline, and check which content was visible and eligible for LCP. Do not assume the hero image was measured.")

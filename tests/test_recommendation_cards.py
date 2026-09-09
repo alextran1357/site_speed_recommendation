@@ -155,6 +155,32 @@ class RecommendationCardsTest(unittest.TestCase):
         self.assertIn("whether these visitor results cover this page or the whole website", interpretation["body"])
         self.assertIn("The simulated test has no result", interpretation["body"])
 
+    def test_core_web_vitals_precede_tbt_even_with_lower_severity(self):
+        for metric, value, expected in (
+            ("largest-contentful-paint", 6990, "LCP"),
+            ("largest-contentful-paint", 2600, "LCP"),
+            ("cumulative-layout-shift", 0.11, "CLS"),
+            ("INTERACTION_TO_NEXT_PAINT", 210, "INP"),
+        ):
+            for scope in ("URL", "Origin", None):
+                with self.subTest(metric=metric, scope=scope):
+                    lab, field = audit_rows({metric: value, "total-blocking-time": 865})
+                    issues = site_tester.build_priority_issues(lab, field, scope)
+                    self.assertEqual(issues[0]["short"], expected)
+                    if expected != "INP":
+                        self.assertEqual(issues[-1]["short"], "TBT")
+                    else:
+                        self.assertEqual(len(issues), 1)
+                        self.assertEqual(issues[0]["lab_row"]["short"], "TBT")
+
+    def test_tbt_remains_first_when_core_web_vitals_are_good_or_unavailable(self):
+        for result in ({}, {"largest-contentful-paint": 2000, "cumulative-layout-shift": 0.05,
+                            "INTERACTION_TO_NEXT_PAINT": 150}):
+            lab, field = audit_rows({**result, "total-blocking-time": 865})
+            issues = site_tester.build_priority_issues(lab, field, "URL")
+            self.assertEqual([item["short"] for item in issues], ["TBT"])
+            self.assertIn("missing results do not mean a pass", site_tester.priority_reason_for(issues[0]))
+
     def test_page_field_issues_precede_more_severe_lab_issues(self):
         lab, field = audit_rows({
             "largest-contentful-paint": 9000, "cumulative-layout-shift": 0.3,
@@ -391,7 +417,8 @@ class RecommendationCardsTest(unittest.TestCase):
         self.assertEqual(len(messages), 3)
         self.assertTrue(all("Platform: Shopify" in message for message in messages))
         self.assertTrue(all("Observed result (Lighthouse simulated test)" in message for message in messages))
-        self.assertIn("Total Blocking Time", messages[0])
+        self.assertIn("Largest Contentful Paint", messages[0])
+        self.assertIn("Total Blocking Time", messages[2])
 
     def test_cards_bypass_markdown(self):
         rows = site_tester.build_field_metric_rows({"field_largest-contentful-paint": 9000})
@@ -419,7 +446,8 @@ class RecommendationCardsTest(unittest.TestCase):
             self.assertFalse(card.proto.unsafe_allow_javascript)
             self.assertIn('class="priority-fix"', card.proto.body)
             self.assertNotIn("Shopify performance help", card.proto.body)
-        self.assertIn("The page may be slow to respond", cards[0].proto.body)
+        self.assertIn("Main content takes too long to appear", cards[0].proto.body)
+        self.assertIn("The page may be slow to respond", cards[2].proto.body)
         self.assertFalse(any("<article " in item.value for item in app.markdown))
 
     def test_general_cms_help_is_shown_once_below_selector(self):

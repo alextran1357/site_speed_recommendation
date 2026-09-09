@@ -108,8 +108,8 @@ PLATFORM_ACTIONS = {
             "Ask your WordPress site designer to identify which main image or text appears late and what is delaying it.",
         ),
         "cls": (
-            "Reload the page and watch for a banner, image, or popup that pushes other content around. Note what moves and when; you do not need to edit code to do this check.",
-            "Send those observations to your WordPress site designer or the responsible plugin's support team. Ask them to keep space available before that item appears.",
+            "Reload the page, then scroll slowly. Watch for images appearing, banners pushing content down, or text changing size. Note what moves and when; these are clues, not confirmed causes.",
+            "Send those observations to your WordPress site designer or the responsible plugin's support team. Ask them to find what causes the movement and how to prevent it.",
         ),
         "javascript": (
             "In Plugins, look for a popup, chat tool, or animation you do not need. On a test copy, turn off one at a time and check whether the page responds better.",
@@ -134,8 +134,8 @@ PLATFORM_ACTIONS = {
             "Ask your Shopify theme designer to identify which main image or text appears late and help it appear sooner.",
         ),
         "cls": (
-            "Reload the page and watch for an announcement bar, popup, or app feature that pushes content around. Note the moving item and when it appears.",
-            "Ask the app provider or your Shopify theme designer to keep space available for that item before it appears.",
+            "Reload the page, then scroll slowly. Watch for images appearing, banners pushing content down, or text changing size. Note what moves and when; these are clues, not confirmed causes.",
+            "Ask the app provider or your Shopify theme designer to find what causes the movement and how to prevent it.",
         ),
         "javascript": (
             "In a copy of your theme, open App embeds in the theme editor. Turn off one nonessential popup, chat tool, or animation and preview the result using the guide below.",
@@ -160,8 +160,8 @@ PLATFORM_ACTIONS = {
             "Ask Wix Support or your site designer to identify why the main image or text appears late.",
         ),
         "cls": (
-            "Reload the page and watch for a banner, gallery, or app feature that pushes content around. Note what moves and when it appears.",
-            "Ask Wix Support, your site designer, or the app provider to keep space available for the moving item before it appears.",
+            "Reload the page, then scroll slowly. Watch for images appearing, banners pushing content down, or text changing size. Note what moves and when; these are clues, not confirmed causes.",
+            "Ask Wix Support, your site designer, or the app provider to find what causes the movement and how to prevent it.",
         ),
         "javascript": (
             "In the Wix editor, try turning off one nonessential animation or app feature. Use the guide below to review extra tools, and preview the page before publishing.",
@@ -186,8 +186,8 @@ PLATFORM_ACTIONS = {
             "Ask your Squarespace site designer to identify which main image or text appears late and what is delaying it.",
         ),
         "cls": (
-            "Reload the page and watch for a banner, popup, or embedded tool that pushes content around. Note what moves and when it appears.",
-            "Ask your Squarespace site designer or the tool's provider to keep space available for the moving item before it appears.",
+            "Reload the page, then scroll slowly. Watch for images appearing, banners pushing content down, or text changing size. Note what moves and when; these are clues, not confirmed causes.",
+            "Ask your Squarespace site designer or the tool's provider to find what causes the movement and how to prevent it.",
         ),
         "javascript": (
             "In the page editor, try hiding one nonessential tool, such as a social feed or chat box, and preview the result. Ask your site designer to handle any custom code.",
@@ -219,8 +219,8 @@ GENERIC_ACTIONS = {
         "Ask your site designer or website provider to identify which main image or text appears late and what is delaying it.",
     ),
     "cls": (
-        "Reload the page and watch for a banner, image, or popup that pushes other content around. Note what moves and when; this check does not require code changes.",
-        "Send your observations to your site designer or website provider. Ask them to keep space available for the moving item before it appears.",
+        "Reload the page, then scroll slowly. Watch for images appearing, banners pushing content down, or text changing size. Note what moves and when; these are clues, not confirmed causes.",
+        "Send your observations to your site designer or website provider. Ask them to find what causes the movement and how to prevent it.",
     ),
     "javascript": (
         "In your site editor, look for a nonessential popup, chat tool, or animation. In a draft, turn off one item and preview whether the page responds better.",

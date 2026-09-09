@@ -33,6 +33,123 @@ def issue_for(result, issue_id="lcp"):
 
 
 class AuditEvidenceTest(unittest.TestCase):
+    def test_script_check_uses_matching_evidence_without_cross_fallback(self):
+        groups = extract_audit_items({
+            "unused-javascript": table([{"url": "https://example.com/unused.js", "wastedBytes": 3000}]),
+            "bootup-time": table([{"url": "https://example.com/busy.js", "total": 850}]),
+        })
+        for metric, value, group, filename, other in (
+            ("mainthread_scriptEvaluation", 850, "script_work", "busy.js", "unused.js"),
+            ("unused-javascript_savings_bytes", 3000, "unused_scripts", "unused.js", "busy.js"),
+        ):
+            with self.subTest(group=group):
+                result = {metric: value, "audit_items": groups, "INTERACTION_TO_NEXT_PAINT": 400}
+                issue = issue_for(result, "responsiveness")
+                fix = site_tester.fix_for_issue(issue, result)
+                finding = site_tester.owner_finding_for(issue, result, fix)
+                self.assertIn(filename, finding)
+                self.assertNotIn(other, finding)
+                request = site_tester.help_request_for(issue, result, "WordPress", "https://example.com", "Mobile")
+                self.assertIn("Starting check: " + finding, request)
+                self.assertIn("not confirmed causes", request)
+                result["audit_items"] = {key: items for key, items in groups.items() if key != group}
+                finding = site_tester.owner_finding_for(issue, result, fix)
+                self.assertIn("did not identify a matching file", finding)
+                self.assertNotIn(other, finding)
+        result = {"audit_items": groups}
+        issue = {"issue_id": "responsiveness"}
+        finding = site_tester.owner_finding_for(issue, result, site_tester.fix_for_issue(issue, result))
+        self.assertNotIn(".js", finding)
+
+    def test_missing_blocking_file_does_not_claim_lcp_is_missing(self):
+        for node in (TEXT, IMAGE, None):
+            with self.subTest(node=node):
+                result = {"render-blocking-insight_lcp_savings_ms": 100,
+                          "audit_items": extract_audit_items({"lcp-breakdown-insight": lcp_audit(node)}) if node else {}}
+                issue = {"issue_id": "lcp"}
+                finding = site_tester.owner_finding_for(issue, result, site_tester.fix_for_issue(issue, result))
+                self.assertIn("specific blocking file", finding)
+                self.assertNotIn("did not identify the main content", finding)
+
+    def test_slow_initial_response_is_checked_before_downstream_savings(self):
+        result = {"document-latency-insight_server_response_ms": 2000,
+                  "render-blocking-insight_lcp_savings_ms": 50}
+        issue = {"issue_id": "lcp"}
+        fix = site_tester.fix_for_issue(issue, result)
+        self.assertEqual(fix["fix_id"], "server")
+        self.assertIn("Check this first", fix["evidence"])
+        for latency in (0, 800, None, float("nan")):
+            with self.subTest(latency=latency):
+                result["document-latency-insight_server_response_ms"] = latency
+                result["network-server-latency"] = 9999
+                self.assertEqual(site_tester.fix_for_issue(issue, result)["fix_id"], "render_blocking")
+
+    def test_cls_owner_copy_is_short_and_details_stay_in_help_request(self):
+        from utils.platform_guidance import PLATFORM_OPTIONS
+        for node in (TEXT, IMAGE, {"type": "node", "selector": "main.products", "nodeLabel": "Category Size Colors " * 30},
+                     {"type": "node", "selector": "#" + "x" * 250}, None):
+            with self.subTest(node=node):
+                groups = extract_audit_items({"layout-shifts": table([{"node": node, "score": 0.3}])})
+                result = {"audit_items": groups, "field_cumulative-layout-shift": 0.4}
+                issue = issue_for(result, "cls")
+                finding = site_tester.owner_finding_for(issue, result, site_tester.fix_for_issue(issue, result))
+                if node in (TEXT, IMAGE):
+                    self.assertIn(node["nodeLabel"], finding)
+                    self.assertIn("Watch whether it moves", finding)
+                elif node and node.get("nodeLabel"):
+                    self.assertIn("Category Size Colors", finding)
+                    self.assertIn("…", finding)
+                    self.assertLess(len(finding), 210)
+                elif node:
+                    self.assertEqual(finding, "")
+                else:
+                    self.assertIn("did not identify which part moved", finding)
+                for platform in PLATFORM_OPTIONS:
+                    guidance = guidance_for(platform, "cls")
+                    self.assertIn("what moves and when", guidance["owner_action"])
+                    for clue in ("images appearing", "banners pushing", "text changing size", "scroll"):
+                        self.assertIn(clue, guidance["owner_action"])
+                    self.assertIn("find what causes the movement", guidance["help_action"])
+                    self.assertNotIn("space available", guidance["help_action"])
+                request = site_tester.help_request_for(issue, result, "WordPress", "https://example.com", "Mobile")
+                if node:
+                    self.assertIn(node["selector"], request)
+                    self.assertIn("a moving element may not be the cause", request)
+
+    def test_cls_unclear_labels_do_not_render_an_empty_finding(self):
+        for label in ("", "div", "img", "https://example.com/a.jpg", "asset_123.jpg", "x" * 41):
+            with self.subTest(label=label):
+                item = {"kind": "element", "label": label, "selector": "main.products", "audit_id": "layout-shifts", "shift_score": 0.3}
+                result = {"audit_items": {"layout": [item]}, "field_cumulative-layout-shift": 0.4}
+                issue = issue_for(result, "cls")
+                with patch.object(site_tester.st, "html") as render:
+                    site_tester.render_recommendation_card(issue, result, "WordPress", 1)
+                body = render.call_args_list[0].args[0]
+                self.assertNotIn('class="audit-finding"', body)
+                self.assertIn("what moves and when", body)
+                request = site_tester.help_request_for(issue, result, "WordPress", "https://example.com", "Mobile")
+                self.assertIn("main.products", request)
+                self.assertIn("Starting check: Reload", request)
+
+    def test_cls_long_label_excerpt_is_escaped_and_full_details_remain(self):
+        label = 'Category Size Colors Size Type Fabric Price 759 Items Sort By Newest to Oldest & More'
+        item = {"kind": "element", "label": label, "selector": "main.products", "audit_id": "layout-shifts", "shift_score": 0.3}
+        result = {"audit_items": {"layout": [item]}, "field_cumulative-layout-shift": 0.4}
+        issue = issue_for(result, "cls")
+        with patch.object(site_tester.st, "html") as render:
+            site_tester.render_recommendation_card(issue, result, "WordPress", 1)
+        body = render.call_args_list[0].args[0]
+        self.assertIn('area labelled “Category Size Colors Size Type Fabric Price 759…”', body)
+        self.assertIn("anything appearing above it", body)
+        self.assertNotIn("Newest to Oldest", body)
+        self.assertIn(label, site_tester.help_request_for(issue, result, "WordPress", "https://example.com", "Mobile"))
+        item["label"] = 'Delivery & "returns"'
+        with patch.object(site_tester.st, "html") as render:
+            site_tester.render_recommendation_card(issue, result, "WordPress", 1)
+        self.assertIn('Delivery &amp; &quot;returns&quot;', render.call_args_list[0].args[0])
+        self.assertEqual(site_tester.issue_title_for(issue), "Content moves unexpectedly")
+        self.assertEqual(site_tester.issue_title_for({**issue, "source": "Lab"}), "Content moves while the page loads")
+
     def test_all_finding_types_keep_units_and_skip_totals_and_subitems(self):
         audits = {
             "lcp-breakdown-insight": lcp_audit(IMAGE),
